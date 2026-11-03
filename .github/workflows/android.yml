@@ -26,6 +26,9 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          accept-android-sdk-licenses: true
+          packages: platform-tools
 
       - name: Find and extract Android project
         shell: bash
@@ -51,6 +54,10 @@ jobs:
             echo "::error::No uploaded ZIP contains both gradlew and settings.gradle/settings.gradle.kts."
             echo "ZIP files found:"
             find . -maxdepth 1 -type f -name '*.zip' -print
+            echo "Archive contents (first entries):"
+            for z in ./*.zip; do
+              [[ -f "$z" ]] && { echo "--- $z"; unzip -Z1 "$z" | head -40; }
+            done
             exit 1
           fi
 
