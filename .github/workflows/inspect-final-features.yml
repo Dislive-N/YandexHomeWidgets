@@ -1,4 +1,4 @@
-name: Inspect v1.5.0 final feature coverage
+name: Inspect v1.5.0 layout and scenario details
 
 on:
   push:
@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Inspect feature implementation
+      - name: Inspect relevant source slices
         shell: bash
         run: |
           set -euo pipefail
@@ -21,22 +21,15 @@ jobs:
           unzip -q YandexHomeWidgets_source.zip -d /tmp/source
           main="/tmp/source/app/src/main/java/ru/dislive/yandexhomewidgets/MainActivity.kt"
           scen="/tmp/source/app/src/main/java/ru/dislive/yandexhomewidgets/ScenarioCenter.kt"
-          echo "=== VERSION ==="
-          cat /tmp/source/VERSION.txt
-          grep -nE 'versionName|versionCode' /tmp/source/app/build.gradle.kts || true
-          echo "=== HOME GRID AND WEATHER 900-1110 ==="
-          sed -n '900,1110p' "$main"
-          echo "=== SETTINGS 2090-2250 ==="
-          sed -n '2090,2250p' "$main"
-          echo "=== GLASS BACKDROP IMPLEMENTATION ==="
-          grep -n -B 20 -A 35 'ApplyGlassDialogBackdropBlur' "$main" || true
-          echo "=== DARK TEXT COLORS ==="
-          grep -nE 'Color\\.(Gray|DarkGray|Black)|0xFF[0-5][0-9A-Fa-f]{5}|onSurface.copy\\(alpha = 0\\.[0-6]' "$main" || true
-          echo "=== SCENARIO FILE LENGTH ==="
-          wc -l "$scen"
-          echo "=== SCENARIO LIST 70-270 ==="
-          sed -n '70,270p' "$scen"
-          echo "=== SCENARIO ACTION EDITOR 300-590 ==="
-          sed -n '300,590p' "$scen"
-          echo "=== UPDATE CHECKER IMPLEMENTATION ==="
-          sed -n '1,140p' /tmp/source/app/src/main/java/ru/dislive/yandexhomewidgets/data/AppUpdates.kt
+          echo "=== GRID CARD ITEMS 1080-1270 ==="
+          sed -n '1080,1270p' "$main"
+          echo "=== DARK THEME DEFINITIONS ==="
+          grep -n 'darkColorScheme\|lightColorScheme\|MaterialTheme(' "$main" || true
+          echo "=== BACKDROP DEFINITION LOCATION ==="
+          grep -Rnl 'fun ApplyGlassDialogBackdropBlur' /tmp/source/app/src/main/java/ru/dislive/yandexhomewidgets || true
+          echo "=== ACTION DIALOG LINE ==="
+          grep -n 'if (actionDialog)' "$scen" || true
+          echo "=== SCENARIO ACTION PICKER 680-900 ==="
+          sed -n '680,900p' "$scen"
+          echo "=== CONDITION INFO BUTTON AND SUMMARY ==="
+          grep -n 'infoAutomation\|TextButton(onClick = { infoAutomation' "$scen" || true
