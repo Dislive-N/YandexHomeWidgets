@@ -19,6 +19,18 @@ jobs:
           base64 -d _transport/source.zip.b64 > /tmp/source.zip
           mkdir -p /tmp/source
           unzip -q /tmp/source.zip -d /tmp/source
+          echo "=== VisualKit.kt ==="
+          sed -n '1,520p' /tmp/source/app/src/main/java/ru/dislive/yandexhomewidgets/VisualKit.kt
+          echo "=== MainActivity declarations and power controls ==="
+          main="/tmp/source/app/src/main/java/ru/dislive/yandexhomewidgets/MainActivity.kt"
+          wc -l "$main"
+          grep -nE '^(@Composable|private )?(fun|data class|enum class|sealed class)|@Composable' "$main" | head -260
+          echo "=== Power control locations (context only; do not modify) ==="
+          grep -nE 'Switch\(|SwitchDefaults|PowerButton|powerButton|powerIcon|togglePower|onPower' "$main" | head -120 || true
+          echo "=== Theme resource colors ==="
+          cat /tmp/source/app/src/main/res/values/colors.xml
+          echo "=== Theme resource styles ==="
+          cat /tmp/source/app/src/main/res/values/styles.xml
           echo "=== Kotlin files ==="
           find /tmp/source -type f -name '*.kt' -not -path '*/build/*' | sort
           echo "=== XML resources ==="
