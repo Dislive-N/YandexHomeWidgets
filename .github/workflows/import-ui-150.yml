@@ -1,0 +1,38 @@
+name: Import verified smart-home 1.5.0 source
+
+on:
+  push:
+    branches: ["smart-home-1.5.0"]
+    paths: ["_transport/patched-source.zip.b64", ".github/workflows/import-ui-150.yml"]
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: smart-home-1.5.0
+          fetch-depth: 0
+      - name: Decode and validate source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d _transport/patched-source.zip.b64 > "$RUNNER_TEMP/patched-source.zip"
+          test "$(unzip -p "$RUNNER_TEMP/patched-source.zip" VERSION.txt | tr -d '[:space:]')" = "1.5.0"
+          unzip -p "$RUNNER_TEMP/patched-source.zip" app/build.gradle.kts | grep -F 'versionName = "1.5.0"'
+          unzip -p "$RUNNER_TEMP/patched-source.zip" app/src/main/java/ru/dislive/yandexhomewidgets/MainActivity.kt | grep -F '.clickable(enabled = enabled && !offline) { onToggle(!on) },'
+          unzip -p "$RUNNER_TEMP/patched-source.zip" app/src/main/java/ru/dislive/yandexhomewidgets/MainActivity.kt | grep -F 'onClick = { onToggle(device.onOff != true) }'
+          unzip -p "$RUNNER_TEMP/patched-source.zip" app/src/main/java/ru/dislive/yandexhomewidgets/MainActivity.kt | grep -F 'onClick = { onToggleGroup(switchable, !allOn) }'
+      - name: Commit source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp "$RUNNER_TEMP/patched-source.zip" YandexHomeWidgets_source.zip
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add YandexHomeWidgets_source.zip
+          git commit -m "feat: import verified smart-home UI 1.5.0"
+          git push origin smart-home-1.5.0
