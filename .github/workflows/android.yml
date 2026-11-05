@@ -196,21 +196,6 @@ jobs:
           PY
           echo "FIXED_SOURCE_ARCHIVE=$RUNNER_TEMP/YandexHomeWidgets_source_fixed.zip" >> "$GITHUB_ENV"
 
-      - name: Stage current dashboard source for review
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p "$GITHUB_WORKSPACE/ui-inspection"
-          cp "$PROJECT_DIR/app/src/main/java/ru/dislive/yandexhomewidgets/MainActivity.kt" "$GITHUB_WORKSPACE/ui-inspection/MainActivity.kt"
-
-      - name: Upload current dashboard source for review
-        uses: actions/upload-artifact@v4
-        with:
-          name: current-dashboard-source
-          path: ui-inspection/MainActivity.kt
-          if-no-files-found: error
-          retention-days: 1
-
       - name: Redesign smart-home dashboard and scenarios
         shell: bash
         run: |
@@ -237,6 +222,21 @@ jobs:
           print(f"Prepared redesigned source archive: {output} ({output.stat().st_size} bytes)")
           PY
           echo "FIXED_SOURCE_ARCHIVE=$RUNNER_TEMP/YandexHomeWidgets_source_fixed.zip" >> "$GITHUB_ENV"
+
+      - name: Stage current dashboard source for review
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/ui-inspection"
+          cp "$PROJECT_DIR/app/src/main/java/ru/dislive/yandexhomewidgets/MainActivity.kt" "$GITHUB_WORKSPACE/ui-inspection/MainActivity.kt"
+
+      - name: Upload current dashboard source for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: current-dashboard-source
+          path: ui-inspection/MainActivity.kt
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Diagnose Android package and signing configuration
         shell: bash
