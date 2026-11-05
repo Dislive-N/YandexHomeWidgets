@@ -122,17 +122,6 @@ jobs:
           echo "PROJECT_DIR=$project_dir" >> "$GITHUB_ENV"
           echo "Project directory: $project_dir"
 
-      - name: Inspect current UI source files
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "=== Kotlin source files ==="
-          find "$PROJECT_DIR/app/src/main/java" -type f -name '*.kt' -print | sort
-          echo "=== Main screen candidates ==="
-          grep -rlE '@Composable|Scaffold|NavigationBar|LazyVerticalGrid' "$PROJECT_DIR/app/src/main/java" --include='*.kt' | sort
-          echo "=== App source directories ==="
-          find "$PROJECT_DIR/app/src/main/java" -maxdepth 7 -type d -print | sort
-
       - name: Fix missing return in Yandex weather parser
         shell: bash
         run: |
@@ -207,13 +196,33 @@ jobs:
           PY
           echo "FIXED_SOURCE_ARCHIVE=$RUNNER_TEMP/YandexHomeWidgets_source_fixed.zip" >> "$GITHUB_ENV"
 
-      - name: Upload extracted source for UI review
-        uses: actions/upload-artifact@v4
-        with:
-          name: smart-home-source-inspection
-          path: ${{ runner.temp }}/YandexHomeWidgets_source_fixed.zip
-          if-no-files-found: error
-          retention-days: 1
+      - name: Redesign smart-home dashboard and scenarios
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_file="$PROJECT_DIR/app/src/main/java/ru/dislive/yandexhomewidgets/MainActivity.kt"
+          if grep -q 'Text("СОСТОЯНИЕ ДОМА"' "$source_file"; then
+            echo "UI_REDESIGN_APPLIED=false" >> "$GITHUB_ENV"
+            echo "Dashboard redesign is already present."
+          else
+            echo "UI_REDESIGN_APPLIED=true" >> "$GITHUB_ENV"
+            printf '%s' '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' | base64 -d | gzip -d > "$RUNNER_TEMP/redesign_dashboard.py"
+            python3 "$RUNNER_TEMP/redesign_dashboard.py" "$source_file"
+          fi
+          python3 - "$PROJECT_DIR" "$RUNNER_TEMP/YandexHomeWidgets_source_fixed.zip" <<'PY'
+          from pathlib import Path
+          import sys
+          import zipfile
+
+          project = Path(sys.argv[1])
+          output = Path(sys.argv[2])
+          with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+              for file_path in sorted(project.rglob("*")):
+                  if file_path.is_file():
+                      archive.write(file_path, file_path.relative_to(project))
+          print(f"Prepared updated source archive: {output} ({output.stat().st_size} bytes)")
+          PY
+          echo "FIXED_SOURCE_ARCHIVE=$RUNNER_TEMP/YandexHomeWidgets_source_fixed.zip" >> "$GITHUB_ENV"
 
       - name: Diagnose Android package and signing configuration
         shell: bash
@@ -282,6 +291,38 @@ jobs:
           PY
           gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/$SOURCE_ARCHIVE" --input "$RUNNER_TEMP/source-update.json"
           echo "Corrected source archive committed."
+
+      - name: Commit redesigned source archive to PR branch
+        if: success() && github.event_name == 'pull_request' && env.UI_REDESIGN_APPLIED == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_BRANCH: ${{ github.head_ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_sha="$(gh api "repos/$GITHUB_REPOSITORY/contents/$SOURCE_ARCHIVE?ref=$TARGET_BRANCH" --jq '.sha')"
+          local_sha="$(git hash-object "$FIXED_SOURCE_ARCHIVE")"
+          if [[ "$remote_sha" == "$local_sha" ]]; then
+            echo "Updated source archive is already committed."
+            exit 0
+          fi
+          python3 - "$FIXED_SOURCE_ARCHIVE" "$remote_sha" "$SOURCE_ARCHIVE" "$TARGET_BRANCH" > "$RUNNER_TEMP/source-update-pr.json" <<'PY'
+          import base64
+          import json
+          import sys
+          from pathlib import Path
+
+          archive_path, sha, repo_path, branch = sys.argv[1:]
+          payload = {
+              "message": "feat: redesign smart home dashboard and scenarios",
+              "content": base64.b64encode(Path(archive_path).read_bytes()).decode("ascii"),
+              "sha": sha,
+              "branch": branch,
+          }
+          print(json.dumps(payload))
+          PY
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/$SOURCE_ARCHIVE" --input "$RUNNER_TEMP/source-update-pr.json"
+          echo "Redesigned source archive committed to $TARGET_BRANCH."
 
       - name: Verify APK package and signing identity
         shell: bash
