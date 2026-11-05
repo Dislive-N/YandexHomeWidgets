@@ -1,0 +1,143 @@
+name: Android CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare Android cache directory
+        run: mkdir -p ~/.android
+
+      - name: Restore stable debug signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android
+          key: yandex-home-debug-signing-key-v1
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Create debug signing key on first build
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -f "$HOME/.android/debug.keystore" ]]; then
+            keytool -genkeypair -v \
+              -keystore "$HOME/.android/debug.keystore" \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          accept-android-sdk-licenses: true
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Find, extract project and read version from archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive=""
+          for candidate in \
+            "YandexHomeWidgets_source.zip" \
+            "YandexHomeWidgets_ready_to_upload.zip" \
+            "YandexHomeWidgets_GitHub_AutoBuild.zip"; do
+            if [[ -f "$candidate" ]] && unzip -Z1 "$candidate" | grep -qE '(^|/)settings\.gradle(\.kts)?$'; then
+              archive="$candidate"
+              break
+            fi
+          done
+          if [[ -z "$archive" ]]; then
+            echo "::error::Gradle project archive not found."
+            exit 1
+          fi
+
+          mkdir -p unpacked
+          unzip -q "$archive" -d unpacked
+
+          version_file="$(find unpacked -type f -name VERSION.txt -print -quit)"
+          if [[ -z "$version_file" ]]; then
+            echo "::warning::VERSION.txt not found inside source archive; using fallback version 1.4.6."
+            app_version="1.4.6"
+          else
+            app_version="$(tr -d '[:space:]' < "$version_file")"
+          fi
+
+          if [[ ! "$app_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Invalid app version: '$app_version'. Expected format like 1.4.6."
+            exit 1
+          fi
+          echo "APP_VERSION=$app_version" >> "$GITHUB_ENV"
+          echo "App version: $app_version"
+
+          settings_file="$(find "$GITHUB_WORKSPACE/unpacked" -type f \( -name settings.gradle -o -name settings.gradle.kts \) -print -quit)"
+          if [[ -z "$settings_file" ]]; then
+            echo "::error::Gradle settings file not found."
+            exit 1
+          fi
+          project_dir="$(dirname "$settings_file")"
+          echo "PROJECT_DIR=$project_dir" >> "$GITHUB_ENV"
+          echo "Project directory: $project_dir"
+
+      - name: Build debug APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$PROJECT_DIR"
+          gradle --no-daemon -PciBuild=${{ github.run_number }} assembleDebug --stacktrace
+          apk="$(find . -type f -path '*/build/outputs/apk/debug/*.apk' -print -quit)"
+          if [[ -z "$apk" ]]; then
+            echo "::error::APK not found."
+            exit 1
+          fi
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          cp "$apk" "$GITHUB_WORKSPACE/dist/YandexHomeWidgets-${APP_VERSION}.apk"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: YandexHomeWidgets-${{ env.APP_VERSION }}-apk
+          path: dist/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish update to GitHub Releases
+        if: github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: app-v${{ env.APP_VERSION }}-build-${{ github.run_number }}
+          name: Яндекс Дом ${{ env.APP_VERSION }} · сборка #${{ github.run_number }}
+          body: |
+            APK версии ${{ env.APP_VERSION }}.
+            Версия прочитана из VERSION.txt или установлена в 1.4.6, если файл отсутствует.
+          prerelease: true
+          files: dist/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
