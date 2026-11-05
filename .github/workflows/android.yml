@@ -25,7 +25,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.android
-          key: yandex-home-debug-signing-key-v1
+          key: yandex-home-debug-signing-key-v2
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -48,6 +48,20 @@ jobs:
               -validity 10000 \
               -dname "CN=Android Debug,O=Android,C=US"
           fi
+
+      - name: Verify persistent Android signing key
+        shell: bash
+        run: |
+          set -euo pipefail
+          key="$HOME/.android/debug.keystore"
+          if [[ ! -s "$key" ]]; then
+            echo "::error::Persistent Android signing key is missing."
+            exit 1
+          fi
+          fingerprint="$(keytool -exportcert -keystore "$key" -storepass android -alias androiddebugkey | sha256sum | awk '{print $1}')"
+          echo "SIGNING_CERT_SHA256=$fingerprint" >> "$GITHUB_ENV"
+          echo "Signing certificate SHA-256: $fingerprint"
+          ls -lh "$key"
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
@@ -237,6 +251,25 @@ jobs:
           PY
           gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/$SOURCE_ARCHIVE" --input "$RUNNER_TEMP/source-update.json"
           echo "Corrected source archive committed."
+
+      - name: Verify APK package and signing identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="$GITHUB_WORKSPACE/dist/YandexHomeWidgets-${APP_VERSION}.apk"
+          badging="$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk")"
+          echo "$badging" | grep -F "package: name='ru.dislive.yandexhomewidgets'" >/dev/null
+          echo "$badging" | grep -F "versionName='${APP_VERSION}'" >/dev/null
+          signer="$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$apk" | awk -F': ' '/Signer #1 certificate SHA-256 digest:/ {print $2; exit}')"
+          if [[ -z "$signer" || "$signer" != "$SIGNING_CERT_SHA256" ]]; then
+            echo "::error::APK signer does not match the persistent Android signing key."
+            echo "Expected: $SIGNING_CERT_SHA256"
+            echo "Actual:   $signer"
+            exit 1
+          fi
+          echo "Verified package: ru.dislive.yandexhomewidgets"
+          echo "Verified version: ${APP_VERSION}"
+          echo "Verified signer SHA-256: $signer"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
