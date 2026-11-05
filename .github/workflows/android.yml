@@ -136,6 +136,31 @@ jobs:
                   f"found old={count}, new={content.count(new)}"
               )
 
+          # Pin debug builds to the persistent CI keystore restored from the Actions cache.
+          gradle_file = project_dir / "app" / "build.gradle.kts"
+          gradle_content = gradle_file.read_text(encoding="utf-8")
+          explicit_signing = 'storeFile = file(System.getenv("HOME") + "/.android/debug.keystore")'
+          if explicit_signing not in gradle_content:
+              android_marker = "android {"
+              if gradle_content.count(android_marker) != 1:
+                  raise SystemExit(f"Cannot safely locate android {{ block in {gradle_file}")
+              signing_block = """android {
+              signingConfigs {
+                  getByName("debug") {
+                      storeFile = file(System.getenv("HOME") + "/.android/debug.keystore")
+                      storePassword = "android"
+                      keyAlias = "androiddebugkey"
+                      keyPassword = "android"
+                  }
+              }
+
+          """
+              gradle_content = gradle_content.replace(android_marker, signing_block, 1)
+              gradle_file.write_text(gradle_content, encoding="utf-8")
+              print(f"Pinned debug signing to persistent CI keystore in {gradle_file}")
+          else:
+              print(f"Persistent CI debug signing already configured in {gradle_file}")
+
           # Rebuild the source archive before Gradle adds build outputs and caches.
           with zipfile.ZipFile(fixed_archive, "w", compression=zipfile.ZIP_DEFLATED) as archive:
               for path in project_dir.rglob("*"):
@@ -176,8 +201,15 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/dist"
           cp "$apk" "$GITHUB_WORKSPACE/dist/YandexHomeWidgets-${APP_VERSION}.apk"
           echo "Selected APK: $apk"
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$apk"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | head -n 1
+          actual_cert="$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$apk" | awk -F': ' '/Signer #1 certificate SHA-256 digest:/ {print tolower($2)}')"
+          expected_cert="$(keytool -list -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey | awk -F': ' '/SHA256:/ {gsub(/:/, "", $2); print tolower($2)}')"
+          echo "APK signer SHA-256: $actual_cert"
+          echo "Persistent keystore SHA-256: $expected_cert"
+          if [[ -z "$actual_cert" || "$actual_cert" != "$expected_cert" ]]; then
+            echo "::error::APK is not signed with the persistent CI keystore; refusing to publish an update-incompatible APK."
+            exit 1
+          fi
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep '^package:'
 
       - name: Update source archive with the verified fix
         if: success() && github.event_name != 'pull_request'
