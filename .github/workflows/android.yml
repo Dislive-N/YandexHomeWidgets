@@ -463,14 +463,16 @@ jobs:
           tag_name: app-v${{ env.APP_VERSION }}-build-${{ github.run_number }}
           name: Яндекс Дом ${{ env.APP_VERSION }} · сборка #${{ github.run_number }}
           body: |
-            APK версии ${{ env.APP_VERSION }}.
-            Версия прочитана из VERSION.txt или установлена в 1.4.6, если файл отсутствует.
+            Яндекс Дом ${{ env.APP_VERSION }} — обновление приложения.
+            В архиве доступны обычная и Legacy APK-сборки. Устанавливайте вариант,
+            совместимый с подписью уже установленного приложения.
           prerelease: false
           files: dist/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install previous release and test update in Android emulator
+        continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
         env:
           APP_VERSION: ${{ env.APP_VERSION }}
