@@ -1,0 +1,27 @@
+name: Inspect UI source archive
+
+on:
+  push:
+    branches: ["ui-glassmorphism"]
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d _transport/source.zip.b64 > /tmp/source.zip
+          mkdir -p /tmp/source
+          unzip -q /tmp/source.zip -d /tmp/source
+          echo "=== Kotlin files ==="
+          find /tmp/source -type f -name '*.kt' -not -path '*/build/*' | sort
+          echo "=== XML resources ==="
+          find /tmp/source -type f -name '*.xml' -not -path '*/build/*' | grep -E '/(res|layout|drawable|values)/' | sort | head -200
+          echo "=== Gradle/version files ==="
+          find /tmp/source -type f \( -name 'settings.gradle*' -o -name 'build.gradle*' -o -name 'VERSION.txt' \) | sort
