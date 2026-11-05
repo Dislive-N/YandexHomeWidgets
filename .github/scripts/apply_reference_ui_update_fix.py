@@ -491,7 +491,7 @@ private fun CompactDeviceTile(
                 .padding(if (cardSize == "large") 15.dp else 13.dp)
         ) {
             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         Modifier.size(iconSize + 8.dp).clip(RoundedCornerShape(19.dp))
                             .background(if (offline) Color.White.copy(alpha = 0.045f) else if (on) Color(0xFF9B7BFA).copy(alpha = 0.15f) else Color.White.copy(alpha = 0.055f)),
@@ -501,56 +501,58 @@ private fun CompactDeviceTile(
                             if (offline) Color(0xFF9298A5) else if (on) Color(0xFFD2C2FF) else Color(0xFFB8BFCC))
                     }
                     Spacer(Modifier.weight(1f))
-                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                        Box(
-                            Modifier.size(36.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.055f))
-                                .clickable { onFavorite(!device.isFavorite) },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(if (device.isFavorite) "★" else "☆",
-                                color = if (device.isFavorite) Color(0xFFFFD166) else Color.White.copy(alpha = 0.56f), fontSize = 19.sp)
-                        }
-                        if (device.canToggle) {
-                            Box(
-                                Modifier.size(powerSize).clip(CircleShape)
-                                    .background(when { offline -> Color(0xFF4A4650); on -> Color(0xFF8059E8); else -> Color(0xFF414653) })
-                                    .clickable(enabled = enabled && !offline) { onToggle(!on) },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (pending) CircularProgressIndicator(Modifier.size(19.dp), strokeWidth = 2.dp, color = Color.White)
-                                else SmartGlyph(if (on) "off" else "power", Modifier.size(24.dp), Color.White)
-                            }
-                        }
+                    Box(
+                        Modifier.size(36.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.055f))
+                            .clickable { onFavorite(!device.isFavorite) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(if (device.isFavorite) "★" else "☆",
+                            color = if (device.isFavorite) Color(0xFFFFD166) else Color.White.copy(alpha = 0.56f), fontSize = 19.sp)
                     }
                 }
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(device.name, color = Color(0xFFF3F4F8), fontWeight = FontWeight.Bold,
-                        fontSize = titleSize, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Box(Modifier.size(7.dp).clip(CircleShape).background(statusColor))
-                        Text(
-                            when {
-                                offline -> "Не в сети"
-                                pending && on -> "Включение…"
-                                pending && !on -> "Выключение…"
-                                on -> "Включено"
-                                device.onOff == false -> "Выключено"
-                                else -> "Готово к управлению"
-                            },
-                            color = if (offline) Color(0xFFFF7888) else Color.White.copy(alpha = 0.72f),
-                            fontSize = 10.sp, fontWeight = if (offline || on) FontWeight.SemiBold else FontWeight.Normal,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
-                        )
-                        if (device.room.isNotBlank()) Text(device.room, color = Color.White.copy(alpha = 0.44f),
-                            fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(device.name, color = Color(0xFFF3F4F8), fontWeight = FontWeight.Bold,
+                            fontSize = titleSize, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Box(Modifier.size(7.dp).clip(CircleShape).background(statusColor))
+                            Text(
+                                when {
+                                    offline -> "Не в сети"
+                                    pending && on -> "Включение…"
+                                    pending && !on -> "Выключение…"
+                                    on -> "Включено"
+                                    device.onOff == false -> "Выключено"
+                                    else -> "Готово к управлению"
+                                },
+                                color = if (offline) Color(0xFFFF7888) else Color.White.copy(alpha = 0.72f),
+                                fontSize = 10.sp, fontWeight = if (offline || on) FontWeight.SemiBold else FontWeight.Normal,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        if (device.room.isNotBlank()) {
+                            Text(device.room, color = Color.White.copy(alpha = 0.44f), fontSize = 9.sp,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                    if (device.canToggle) {
+                        Spacer(Modifier.width(9.dp))
+                        Box(
+                            Modifier.size(powerSize).clip(CircleShape)
+                                .background(when { offline -> Color(0xFF4A4650); on -> Color(0xFF8059E8); else -> Color(0xFF414653) })
+                                .clickable(enabled = enabled && !offline) { onToggle(!on) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (pending) CircularProgressIndicator(Modifier.size(19.dp), strokeWidth = 2.dp, color = Color.White)
+                            else SmartGlyph(if (on) "off" else "power", Modifier.size(24.dp), Color.White)
+                        }
                     }
                 }
             }
         }
     }
 }
-'''
+''';
     main = main[:start] + tile + main[end:]
 
     main = main.replace(
