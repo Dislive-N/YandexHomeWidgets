@@ -122,17 +122,6 @@ jobs:
           echo "PROJECT_DIR=$project_dir" >> "$GITHUB_ENV"
           echo "Project directory: $project_dir"
 
-      - name: Inspect UI source files
-        if: github.event_name == 'pull_request'
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "=== Kotlin UI candidates ==="
-          find "$PROJECT_DIR/app/src/main" -type f -name '*.kt' | sort | grep -Ei '(Main|Home|Device|Theme|Screen|Dashboard|Navigation|Setting|Room|Scene)' || true
-          echo "=== Resource files ==="
-          find "$PROJECT_DIR/app/src/main/res" -type f | sort | head -250
-          echo "=== Relevant visual and control declarations ==="
-          grep -RniE --include='*.kt' 'Switch\(|SwitchDefaults|Power|power|toggle|navigationBar|Scaffold|background\(|Brush\.|Card\(' "$PROJECT_DIR/app/src/main/java" | head -300 || true
       - name: Fix missing return in Yandex weather parser
         shell: bash
         run: |
