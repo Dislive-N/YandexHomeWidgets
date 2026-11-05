@@ -5,7 +5,7 @@ on:
     branches: ["feature-ui-adjustments"]
     paths:
       - ".github/workflows/apply-ui-150.yml"
-      - "_transport/apply_ui_150.py.gz.b64"
+      - "tools/apply_ui_150.py"
 
 permissions:
   contents: write
@@ -18,10 +18,8 @@ jobs:
         with:
           ref: feature-ui-adjustments
           fetch-depth: 0
-      - name: Restore patch script
-        run: base64 -d _transport/apply_ui_150.py.gz.b64 | gzip -d > /tmp/apply_ui_150.py
       - name: Apply UI patch to source archive
-        run: python3 /tmp/apply_ui_150.py YandexHomeWidgets_source.zip
+        run: python3 tools/apply_ui_150.py YandexHomeWidgets_source.zip
       - name: Commit source archive only
         run: |
           set -euo pipefail
