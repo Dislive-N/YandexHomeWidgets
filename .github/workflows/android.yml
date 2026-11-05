@@ -105,8 +105,8 @@ jobs:
             app_version="$(tr -d '[:space:]' < "$version_file")"
           fi
 
-          # UI refresh release: bump the app to 1.5.2.
-          app_version="1.5.2"
+          # Dashboard redesign release: bump the app to 1.5.3.
+          app_version="1.5.3"
           if [[ -n "$version_file" ]]; then
             printf '%s\n' "$app_version" > "$version_file"
           fi
@@ -232,7 +232,7 @@ jobs:
         run: |
           set -euo pipefail
           source_file="$PROJECT_DIR/app/src/main/java/ru/dislive/yandexhomewidgets/MainActivity.kt"
-          if grep -q 'UI-REFINED-1.5.2' "$source_file"; then
+          if grep -q 'UI-REFINED-1.5.3' "$source_file"; then
             echo "UI_REDESIGN_APPLIED=false" >> "$GITHUB_ENV"
             echo "Dashboard 1.5.2 refinement already applied."
           else
