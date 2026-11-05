@@ -307,7 +307,7 @@ jobs:
           echo "Corrected source archive committed."
 
       - name: Commit redesigned source archive to PR branch
-        if: success() && github.event_name == 'pull_request' && env.UI_REDESIGN_APPLIED == 'true'
+        if: success() && github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
           TARGET_BRANCH: ${{ github.head_ref }}
