@@ -106,6 +106,18 @@ jobs:
           echo "PROJECT_DIR=$project_dir" >> "$GITHUB_ENV"
           echo "Project directory: $project_dir"
 
+      - name: Inspect LocationWeather compile error
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_file="$(find unpacked -type f -name LocationWeather.kt -print -quit)"
+          if [[ -z "$source_file" ]]; then
+            echo "::error::LocationWeather.kt not found in extracted source."
+            exit 1
+          fi
+          echo "Source file: $source_file"
+          nl -ba "$source_file" | sed -n '130,190p'
+
       - name: Build debug APK
         shell: bash
         run: |
