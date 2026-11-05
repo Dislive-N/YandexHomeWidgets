@@ -124,10 +124,17 @@ jobs:
           old = "                CurrentWeather(\n                    temperatureC = temp,"
           new = "                return CurrentWeather(\n                    temperatureC = temp,"
           count = content.count(old)
-          if count != 1:
-              raise SystemExit(f"Expected exactly one Yandex parser expression to patch, found {count}")
-          source.write_text(content.replace(old, new, 1), encoding="utf-8")
-          print(f"Patched {source}: explicit return added to parseYandex")
+          if count == 1:
+              content = content.replace(old, new, 1)
+              source.write_text(content, encoding="utf-8")
+              print(f"Patched {source}: explicit return added to parseYandex")
+          elif count == 0 and content.count(new) == 1:
+              print(f"Already fixed: {source}")
+          else:
+              raise SystemExit(
+                  f"Expected one unpatched or one patched Yandex parser expression; "
+                  f"found old={count}, new={content.count(new)}"
+              )
 
           # Rebuild the source archive before Gradle adds build outputs and caches.
           with zipfile.ZipFile(fixed_archive, "w", compression=zipfile.ZIP_DEFLATED) as archive:
