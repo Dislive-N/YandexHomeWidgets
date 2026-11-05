@@ -207,6 +207,14 @@ jobs:
           PY
           echo "FIXED_SOURCE_ARCHIVE=$RUNNER_TEMP/YandexHomeWidgets_source_fixed.zip" >> "$GITHUB_ENV"
 
+      - name: Upload extracted source for UI review
+        uses: actions/upload-artifact@v4
+        with:
+          name: smart-home-source-inspection
+          path: ${{ runner.temp }}/YandexHomeWidgets_source_fixed.zip
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Diagnose Android package and signing configuration
         shell: bash
         run: |
