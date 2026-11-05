@@ -1,0 +1,30 @@
+name: Apply compile fixes for UI 1.5.0
+
+on:
+  push:
+    branches: ["feature-ui-adjustments"]
+    paths:
+      - ".github/workflows/apply-ui-fix-150.yml"
+      - "tools/fix_ui_150.py"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature-ui-adjustments
+          fetch-depth: 0
+      - name: Fix source archive compile issues
+        run: python3 tools/fix_ui_150.py YandexHomeWidgets_source.zip
+      - name: Commit source archive
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add YandexHomeWidgets_source.zip
+          git commit -m "fix: compile adaptive UI and scenario details (1.5.0)"
+          git push origin feature-ui-adjustments
