@@ -5,7 +5,9 @@ import subprocess
 import sys
 
 source = Path(sys.argv[1])
-text = source.read_text(encoding="utf-8")
+subprocess.run([sys.executable, str(Path(__file__).with_name("apply_reference_ui_update_fix.py")), str(source.parents[7])], check=True)
+print("Applied reference UI and compatible APK updater patch.")
+raise SystemExit(0)
 
 tile_start = text.find("@Composable\nprivate fun CompactDeviceTile(")
 tile_end = text.find("\nprivate fun deviceIcon(type:", tile_start)
