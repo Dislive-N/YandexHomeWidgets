@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Apply the reference-style home screen and signature-aware APK update selection."""
 from pathlib import Path
+import re
 import sys
 
 project = Path(sys.argv[1])
@@ -149,12 +150,18 @@ if "LEGACY_SIGNING_SHA256" not in updates:
         "    val notes: String,\n    val apkVariant: String = \"Standard\"\n)",
         "update info variant field"
     )
-    updates = replace_once(
-        updates,
-        "    suspend fun check(installedVersion: String, installedBuildCode: Int) = withContext(Dispatchers.IO) {",
-        "    private const val LEGACY_SIGNING_SHA256 = \"380579e149bd610f4c5aa48691bd7d7ea872c113075d0c8fcb99845b0603351c\"\n\n    suspend fun check(context: Context, installedVersion: String, installedBuildCode: Int) = withContext(Dispatchers.IO) {\n        val legacyInstall = isLegacySignedInstall(context)",
-        "update checker signature"
+    signature_pattern = re.compile(
+        r"    suspend fun check\([^)]*\)(?:\s*:\s*[^=\n]+)?\s*=\s*withContext\(Dispatchers\.IO\) \{"
     )
+    updates, signature_count = signature_pattern.subn(
+        "    private const val LEGACY_SIGNING_SHA256 = \"380579e149bd610f4c5aa48691bd7d7ea872c113075d0c8fcb99845b0603351c\"\\n\\n"
+        "    suspend fun check(context: Context, installedVersion: String, installedBuildCode: Int) = withContext(Dispatchers.IO) {\\n"
+        "        val legacyInstall = isLegacySignedInstall(context)",
+        updates,
+        count=1
+    )
+    if signature_count != 1:
+        raise SystemExit("Could not safely locate AppUpdateChecker.check signature")
     old_asset = '''                    val apkUrl = release.optJSONArray("assets")?.let { assets ->
                         (0 until assets.length()).mapNotNull { assets.optJSONObject(it) }
                             .firstOrNull {
