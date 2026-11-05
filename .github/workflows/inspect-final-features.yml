@@ -1,4 +1,4 @@
-name: Inspect v1.5.0 layout and scenario details
+name: Inspect final UI details
 
 on:
   push:
@@ -13,23 +13,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Inspect relevant source slices
+      - name: Inspect dark theme, blur and cards
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p /tmp/source
           unzip -q YandexHomeWidgets_source.zip -d /tmp/source
           main="/tmp/source/app/src/main/java/ru/dislive/yandexhomewidgets/MainActivity.kt"
-          scen="/tmp/source/app/src/main/java/ru/dislive/yandexhomewidgets/ScenarioCenter.kt"
-          echo "=== GRID CARD ITEMS 1080-1270 ==="
-          sed -n '1080,1270p' "$main"
-          echo "=== DARK THEME DEFINITIONS ==="
-          grep -n 'darkColorScheme\|lightColorScheme\|MaterialTheme(' "$main" || true
-          echo "=== BACKDROP DEFINITION LOCATION ==="
-          grep -Rnl 'fun ApplyGlassDialogBackdropBlur' /tmp/source/app/src/main/java/ru/dislive/yandexhomewidgets || true
-          echo "=== ACTION DIALOG LINE ==="
-          grep -n 'if (actionDialog)' "$scen" || true
-          echo "=== SCENARIO ACTION PICKER 680-900 ==="
-          sed -n '680,900p' "$scen"
-          echo "=== CONDITION INFO BUTTON AND SUMMARY ==="
-          grep -n 'infoAutomation\|TextButton(onClick = { infoAutomation' "$scen" || true
+          echo "=== THEME 380-420 ==="
+          sed -n '380,420p' "$main"
+          echo "=== TILE 1260-1380 ==="
+          sed -n '1260,1380p' "$main"
+          echo "=== BACKDROP FILE ==="
+          sed -n '1,180p' /tmp/source/app/src/main/java/ru/dislive/yandexhomewidgets/GlassDialogBlur.kt
+          echo "=== ALL HARD-CODED DARK TEXT COLORS IN SOURCE ==="
+          grep -RniE --include='*.kt' 'Color\\.(Black|DarkGray|Gray)|0xFF[0-5][0-9A-Fa-f]{5}' /tmp/source/app/src/main/java/ru/dislive/yandexhomewidgets || true
