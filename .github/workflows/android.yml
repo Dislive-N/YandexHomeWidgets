@@ -360,7 +360,7 @@ jobs:
           body: |
             APK версии ${{ env.APP_VERSION }}.
             Версия прочитана из VERSION.txt или установлена в 1.4.6, если файл отсутствует.
-          prerelease: true
+          prerelease: false
           files: dist/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -384,7 +384,7 @@ jobs:
               -o "$RUNNER_TEMP/YandexHomeWidgets-1.4.7.apk"
             adb install "$RUNNER_TEMP/YandexHomeWidgets-1.4.7.apk"
             adb install -r "dist/YandexHomeWidgets-${APP_VERSION}.apk"
-            adb shell dumpsys package ru.dislive.yandexhomewidgets | grep -F "versionName=1.4.8"
+            adb shell dumpsys package ru.dislive.yandexhomewidgets | grep -F "versionName=${APP_VERSION}"
             adb shell am force-stop ru.dislive.yandexhomewidgets
             adb shell am start -W -n ru.dislive.yandexhomewidgets/.MainActivity
             sleep 8
