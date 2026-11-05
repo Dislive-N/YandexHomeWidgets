@@ -1,0 +1,33 @@
+name: Apply requested UI 1.5.0
+
+on:
+  push:
+    branches: ["feature-ui-adjustments"]
+    paths:
+      - ".github/workflows/apply-ui-150.yml"
+      - "_transport/apply_ui_150.py.gz.b64"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature-ui-adjustments
+          fetch-depth: 0
+      - name: Restore patch script
+        run: |
+          base64 -d _transport/apply_ui_150.py.gz.b64 | gzip -d > /tmp/apply_ui_150.py
+      - name: Apply UI patch to source archive
+        run: python3 /tmp/apply_ui_150.py YandexHomeWidgets_source.zip
+      - name: Commit source archive only
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add YandexHomeWidgets_source.zip
+          git commit -m "feat: requested smart-home UI refinements (1.5.0)"
+          git push origin feature-ui-adjustments
