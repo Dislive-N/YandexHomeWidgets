@@ -21,6 +21,7 @@ jobs:
       - name: Prepare Android cache directory
         run: mkdir -p ~/.android
 
+      # Cache v2 persists the generated keystore between CI runs.
       - name: Restore stable debug signing key
         uses: actions/cache@v4
         with:
@@ -174,6 +175,17 @@ jobs:
               print(f"Pinned debug signing to persistent CI keystore in {gradle_file}")
           else:
               print(f"Persistent CI debug signing already configured in {gradle_file}")
+
+          # Keep the workflow bundled in the source archive aligned with the repository workflow.
+          embedded_workflow = project_dir / ".github" / "workflows" / "android.yml"
+          if embedded_workflow.is_file():
+              workflow_text = embedded_workflow.read_text(encoding="utf-8")
+              workflow_text = workflow_text.replace(
+                  "yandex-home-debug-signing-key-v1",
+                  "yandex-home-debug-signing-key-v2"
+              )
+              embedded_workflow.write_text(workflow_text, encoding="utf-8")
+              print(f"Updated bundled signing cache key in {embedded_workflow}")
 
           # Rebuild the source archive before Gradle adds build outputs and caches.
           with zipfile.ZipFile(fixed_archive, "w", compression=zipfile.ZIP_DEFLATED) as archive:
