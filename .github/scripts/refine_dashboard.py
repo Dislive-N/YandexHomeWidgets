@@ -5,7 +5,8 @@ import sys
 
 source = Path(sys.argv[1])
 main = source.read_text(encoding="utf-8")
-marker = "// UI-REFINED-1.5.2"
+main = main.replace("// UI-REFINED-1.5.2", "")
+marker = "// UI-REFINED-1.5.3"
 
 if marker in main:
     print("Dashboard UI 1.5.2 already refined.")
@@ -36,7 +37,7 @@ private fun CompactDeviceTile(
     val powerSize = when (cardSize) { "large" -> 48.dp; "small" -> 36.dp; else -> 42.dp }
     val titleSize = when (cardSize) { "large" -> 16.sp; "small" -> 13.sp; else -> 14.sp }
     val cardShape = RoundedCornerShape(22.dp)
-    val tileColor = when { offline -> Color(0xFF332A32); on -> Color(0xFF302D3D); else -> Color(0xFF292D37) }
+    val tileGradient = when { offline -> listOf(Color(0xFF44313F), Color(0xFF2B303C)); on -> listOf(Color(0xFF493773), Color(0xFF2C405B), Color(0xFF29313F)); else -> listOf(Color(0xFF354557), Color(0xFF2A303D), Color(0xFF252B35)) }
     val outline = when {
         offline -> Color(0xFFFF6578).copy(alpha = 0.34f)
         on -> Color(0xFF9B7BFA).copy(alpha = 0.34f)
@@ -48,7 +49,7 @@ private fun CompactDeviceTile(
         Box(
             modifier = Modifier.widthIn(max = cardWidthDp.dp).fillMaxWidth()
                 .height(cardHeightDp.coerceIn(148, 280).dp)
-                .clip(cardShape).background(tileColor).border(1.dp, outline, cardShape)
+                .clip(cardShape).background(Brush.linearGradient(colors = tileGradient, start = Offset.Zero, end = Offset(520f, 720f))).border(1.dp, outline, cardShape)
                 .clickable(onClick = onOpen)
                 .padding(if (cardSize == "large") 15.dp else 13.dp)
         ) {
@@ -132,11 +133,15 @@ private fun CompactDeviceTile(
                         Box(
                             Modifier.size(powerSize).clip(CircleShape)
                                 .background(
-                                    when {
-                                        offline -> Color(0xFF4A4650)
-                                        on -> Color(0xFF8059E8)
-                                        else -> Color(0xFF414653)
-                                    }
+                                    Brush.linearGradient(
+                                        colors = when {
+                                            offline -> listOf(Color(0xFF55404C), Color(0xFF3C3C4A))
+                                            on -> listOf(Color(0xFFAA72FF), Color(0xFF6846C4))
+                                            else -> listOf(Color(0xFF53677F), Color(0xFF39485B))
+                                        },
+                                        start = Offset.Zero,
+                                        end = Offset(180f, 180f)
+                                    )
                                 )
                                 .clickable(enabled = enabled && !offline) { onToggle(!on) },
                             contentAlignment = Alignment.Center
@@ -155,6 +160,62 @@ private fun CompactDeviceTile(
 }
 '''
 main = main[:start] + tile + main[end:]
+
+# Remove repeated home content and replace global light/outlet switches with contextual navigation.
+def replace_kotlin_block(text, anchor, replacement):
+    position = text.find(anchor)
+    if position < 0:
+        raise SystemExit("Could not locate Kotlin block: " + anchor)
+    line_start = text.rfind("\\n", 0, position) + 1
+    opening = text.find("{", position)
+    if opening < 0:
+        raise SystemExit("Kotlin block has no opening brace: " + anchor)
+    depth = 0
+    for index in range(opening, len(text)):
+        if text[index] == "{":
+            depth += 1
+        elif text[index] == "}":
+            depth -= 1
+            if depth == 0:
+                end = index + 1
+                if end < len(text) and text[end] == "\\n":
+                    end += 1
+                return text[:line_start] + replacement + text[end:]
+    raise SystemExit("Could not find closing brace for Kotlin block: " + anchor)
+
+main = replace_kotlin_block(
+    main,
+    'if (favoriteDevices.isNotEmpty() && selectedCategory == "Все") {',
+    ''
+)
+main = replace_kotlin_block(
+    main,
+    'item(span = { GridItemSpan(maxLineSpan) }, key = "home_actions") {',
+    '''        item(span = { GridItemSpan(maxLineSpan) }, key = "home_actions") {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                HomeQuickButton("Группы", Color(0xFF9B7BFA), onOpenGroups, Modifier.widthIn(min = 112.dp))
+                HomeQuickButton("Аналитика", Color(0xFF52C9B0), onAnalytics, Modifier.widthIn(min = 112.dp))
+            }
+        }'''
+)
+main = main.replace(
+    '                        Text(activeCount.toString() + " включено · " + onlineCount + " в сети из " + devices.size, color = Color.White.copy(alpha = 0.76f), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+',
+    ''
+)
+main = main.replace(
+    '.background(Color.White.copy(alpha = 0.075f))',
+    '.background(Brush.linearGradient(listOf(Color(0xFF7654B8).copy(alpha = 0.34f), Color(0xFF32627C).copy(alpha = 0.30f))))',
+    1
+)
+main = main.replace(
+    'Brush.linearGradient(listOf(Color(0xFF302B42), Color(0xFF242C3A), Color(0xFF202D35)))',
+    'Brush.linearGradient(listOf(Color(0xFF493568), Color(0xFF2D4660), Color(0xFF203B43)))',
+    1
+)
 
 # Do not count an unreachable offline device as currently switched on.
 main = main.replace(
@@ -190,4 +251,4 @@ main = main.replace(
 # Add the completion marker so the workflow does not apply the redesign twice.
 main = main.rstrip() + "\n\n" + marker + "\n"
 source.write_text(main, encoding="utf-8")
-print("Applied the 1.5.2 device-card, home-navigation and scenario polish.")
+print("Applied the 1.5.3 gradient dashboard redesign, duplicate cleanup and contextual controls.")
