@@ -162,35 +162,19 @@ private fun CompactDeviceTile(
 main = main[:start] + tile + main[end:]
 
 # Remove repeated home content and replace global light/outlet switches with contextual navigation.
-def replace_kotlin_block(text, anchor, replacement):
-    position = text.find(anchor)
-    if position < 0:
-        raise SystemExit("Could not locate Kotlin block: " + anchor)
-    line_start = text.rfind("\\n", 0, position) + 1
-    opening = text.find("{", position)
-    if opening < 0:
-        raise SystemExit("Kotlin block has no opening brace: " + anchor)
-    depth = 0
-    for index in range(opening, len(text)):
-        if text[index] == "{":
-            depth += 1
-        elif text[index] == "}":
-            depth -= 1
-            if depth == 0:
-                end = index + 1
-                if end < len(text) and text[end] == "\\n":
-                    end += 1
-                return text[:line_start] + replacement + text[end:]
-    raise SystemExit("Could not find closing brace for Kotlin block: " + anchor)
+import re
 
-main = replace_kotlin_block(
+main, favorites_removed = re.subn(
+    r'(?ms)^            if \(favoriteDevices\.isNotEmpty\(\) && selectedCategory == "Все"\) \{\n.*?^            \}\n(?=            item\(span)',
+    '',
     main,
-    'if (favoriteDevices.isNotEmpty() && selectedCategory == "Все") {',
-    ''
+    count=1
 )
-main = replace_kotlin_block(
-    main,
-    'item(span = { GridItemSpan(maxLineSpan) }, key = "home_actions") {',
+if favorites_removed != 1:
+    raise SystemExit("Could not remove the duplicated favorites shelf")
+
+main, actions_replaced = re.subn(
+    r'(?ms)^        item\(span = \{ GridItemSpan\(maxLineSpan\) \}, key = "home_actions"\) \{\n.*?^        \}\n(?=        item\(span = \{ GridItemSpan\(maxLineSpan\) \}, key = "device_categories"\))',
     '''        item(span = { GridItemSpan(maxLineSpan) }, key = "home_actions") {
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -199,12 +183,19 @@ main = replace_kotlin_block(
                 HomeQuickButton("Группы", Color(0xFF9B7BFA), onOpenGroups, Modifier.widthIn(min = 112.dp))
                 HomeQuickButton("Аналитика", Color(0xFF52C9B0), onAnalytics, Modifier.widthIn(min = 112.dp))
             }
-        }'''
+        }
+''',
+    main,
+    count=1
 )
-main = main.replace(
-    '                        Text(activeCount.toString() + " включено · " + onlineCount + " в сети из " + devices.size, color = Color.White.copy(alpha = 0.76f), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-',
-    ''
+if actions_replaced != 1:
+    raise SystemExit("Could not replace global light and outlet controls")
+
+main = re.sub(
+    r'(?m)^\s*Text\(activeCount\.toString\(\) \+ " включено · ".*\n',
+    '',
+    main,
+    count=1
 )
 main = main.replace(
     '.background(Color.White.copy(alpha = 0.075f))',
