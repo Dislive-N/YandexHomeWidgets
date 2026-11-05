@@ -85,7 +85,7 @@ summary = '''        item(span = { GridItemSpan(maxLineSpan) }, key = "dashboard
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold
                             )
-                            Text("$activeCount включено из \${devices.size} устройств", color = Color.White.copy(alpha = 0.82f), fontSize = 11.sp)
+                            Text("$activeCount включено из ${devices.size} устройств", color = Color.White.copy(alpha = 0.82f), fontSize = 11.sp)
                         }
                         Box(
                             modifier = Modifier.size(46.dp)
@@ -117,7 +117,7 @@ favorites = '''        if (selectedCategory == "Все" && favoriteDevices.isNot
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Избранное", fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                        Text("\${favoriteDevices.size}", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.62f), fontSize = 11.sp)
+                        Text("${favoriteDevices.size}", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.62f), fontSize = 11.sp)
                     }
                     Row(
                         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -175,7 +175,7 @@ old = '''        if (visibleDevices.isEmpty()) {
 new = '''        item(span = { GridItemSpan(maxLineSpan) }, key = "devices_section_title") {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp, bottom = 1.dp)) {
                 Text(if (selectedCategory == "Все") "Устройства" else selectedCategory, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                Text("\${visibleDevices.size}", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.62f), fontSize = 11.sp)
+                Text("${visibleDevices.size}", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.62f), fontSize = 11.sp)
             }
         }
         if (visibleDevices.isEmpty()) {
