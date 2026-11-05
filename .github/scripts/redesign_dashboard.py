@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Migrate the current Compose dashboard to the v1.5 UI."""
 from pathlib import Path
+import subprocess
 import sys
 
 source = Path(sys.argv[1])
@@ -15,6 +16,7 @@ if (
     and "Modifier.widthIn(max = cardWidthDp.dp)" in tile_source
 ):
     print("Dashboard v1.5 already applied.")
+    subprocess.run([sys.executable, str(Path(__file__).with_name("apply_reference_ui_update_fix.py")), str(source.parents[7])], check=True)
     raise SystemExit(0)
 
 
@@ -264,4 +266,5 @@ private fun DashboardStatusChip(label: String, value: String, tint: Color, modif
     text = text.replace(marker, helper + marker, 1)
 
 source.write_text(text, encoding="utf-8")
+subprocess.run([sys.executable, str(Path(__file__).with_name("apply_reference_ui_update_fix.py")), str(source.parents[7])], check=True)
 print(f"Updated {source}")
