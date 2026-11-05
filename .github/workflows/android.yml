@@ -112,13 +112,14 @@ jobs:
         run: |
           set -euo pipefail
           source_file="$PROJECT_DIR/app/src/main/java/ru/dislive/yandexhomewidgets/data/LocationWeather.kt"
-          python3 - "$source_file" "$RUNNER_TEMP/YandexHomeWidgets_source_fixed.zip" <<'PY'
+          python3 - "$source_file" "$RUNNER_TEMP/YandexHomeWidgets_source_fixed.zip" "$PROJECT_DIR" <<'PY'
           from pathlib import Path
           import sys
           import zipfile
 
           source = Path(sys.argv[1])
           fixed_archive = Path(sys.argv[2])
+          project_dir = Path(sys.argv[3])
           content = source.read_text(encoding="utf-8")
           old = "                CurrentWeather(\n                    temperatureC = temp,"
           new = "                return CurrentWeather(\n                    temperatureC = temp,"
@@ -128,7 +129,6 @@ jobs:
           source.write_text(content.replace(old, new, 1), encoding="utf-8")
           print(f"Patched {source}: explicit return added to parseYandex")
 
-          project_dir = source.parents[5]
           # Rebuild the source archive before Gradle adds build outputs and caches.
           with zipfile.ZipFile(fixed_archive, "w", compression=zipfile.ZIP_DEFLATED) as archive:
               for path in project_dir.rglob("*"):
