@@ -284,10 +284,12 @@ with tempfile.TemporaryDirectory() as td:
         '            Column(Modifier.fillMaxSize()) {\n                Column(\n',
         '            Column(Modifier.fillMaxSize()) {\n                ApplyGlassDialogBackdropBlur()\n                Column(\n',
         "scenario editor blur")
-    scenario = once(scenario,
-        '                Column(Modifier.fillMaxSize()) {\n                    Column(Modifier.fillMaxWidth().background(Brush.horizontalGradient',
-        '                Column(Modifier.fillMaxSize()) {\n                    ApplyGlassDialogBackdropBlur()\n                    Column(Modifier.fillMaxWidth().background(Brush.horizontalGradient',
-        "action dialog blur")
+    action_dialog_marker = '                Column(Modifier.fillMaxSize()) {\n                    Column(Modifier.fillMaxWidth().background(Brush.horizontalGradient'
+    action_dialog_blur = '                Column(Modifier.fillMaxSize()) {\n                    ApplyGlassDialogBackdropBlur()\n                    Column(Modifier.fillMaxWidth().background(Brush.horizontalGradient'
+    action_dialog_count = scenario.count(action_dialog_marker)
+    if action_dialog_count < 1:
+        raise SystemExit("No translucent action dialog shells found")
+    scenario = scenario.replace(action_dialog_marker, action_dialog_blur)
 
     glass = root / "app/src/main/java/ru/dislive/yandexhomewidgets/GlassDialogBlur.kt"
     if glass.exists():
