@@ -44,6 +44,8 @@ jobs:
           unzip -q YandexHomeWidgets_source.zip -d unpacked
           test "$(tr -d '[:space:]' < unpacked/VERSION.txt)" = "1.5.0"
           grep -F 'versionName = "1.5.0"' unpacked/app/build.gradle.kts
+      - name: Report source revision under test
+        run: git log -1 --oneline
       - name: Compile Android app
         working-directory: unpacked
         run: gradle --no-daemon :app:assembleDebug --stacktrace
