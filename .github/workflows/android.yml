@@ -122,6 +122,17 @@ jobs:
           echo "PROJECT_DIR=$project_dir" >> "$GITHUB_ENV"
           echo "Project directory: $project_dir"
 
+      - name: Inspect current UI source files
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "=== Kotlin source files ==="
+          find "$PROJECT_DIR/app/src/main/java" -type f -name '*.kt' -print | sort
+          echo "=== Main screen candidates ==="
+          grep -rlE '@Composable|Scaffold|NavigationBar|LazyVerticalGrid' "$PROJECT_DIR/app/src/main/java" --include='*.kt' | sort
+          echo "=== App source directories ==="
+          find "$PROJECT_DIR/app/src/main/java" -maxdepth 7 -type d -print | sort
+
       - name: Fix missing return in Yandex weather parser
         shell: bash
         run: |
