@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Inspect source archive
+      - name: Inspect targeted Compose sections
         shell: bash
         run: |
           set -euo pipefail
@@ -20,19 +20,13 @@ jobs:
           mkdir -p /tmp/source
           unzip -q /tmp/source.zip -d /tmp/source
           main="/tmp/source/app/src/main/java/ru/dislive/yandexhomewidgets/MainActivity.kt"
-          echo "=== IMPORTS AND APP SHELL ==="
-          sed -n '1,260p' "$main"
-          echo "=== HOME SCREEN AND QUICK ACTIONS ==="
-          sed -n '835,1245p' "$main"
-          echo "=== DETAILS AND DEVICE CARD ==="
-          sed -n '1246,1728p' "$main"
-          echo "=== SCENARIO AND HISTORY SCREENS ==="
-          sed -n '1875,1948p' "$main"
-          echo "=== SETTINGS SCREEN ==="
-          sed -n '2049,2188p' "$main"
-          echo "=== VISUAL KIT COMPOSABLES ==="
-          visual="/tmp/source/app/src/main/java/ru/dislive/yandexhomewidgets/VisualKit.kt"
-          grep -nE '^(@Composable|fun |private fun |private val |private const val )' "$visual"
-          echo "=== COLOR AND SYSTEM THEME RESOURCES ==="
-          cat /tmp/source/app/src/main/res/values/colors.xml
-          cat /tmp/source/app/src/main/res/values/styles.xml
+          echo "=== APP COMPOSITION 250-835 ==="
+          sed -n '250,835p' "$main"
+          echo "=== DEVICE DETAILS + CARD 1247-1653 ==="
+          sed -n '1247,1653p' "$main"
+          echo "=== SCENARIO/HISTORY UI 1875-2048 ==="
+          sed -n '1875,2048p' "$main"
+          echo "=== VISUAL KIT ICON TILE 326-358 ==="
+          sed -n '326,358p' /tmp/source/app/src/main/java/ru/dislive/yandexhomewidgets/VisualKit.kt
+          echo "=== VERSION ==="
+          cat /tmp/source/VERSION.txt
