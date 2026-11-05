@@ -283,6 +283,88 @@ jobs:
           echo "Verified version: ${APP_VERSION}"
           echo "Verified signer SHA-256: $signer"
 
+      - name: Preserve current signing key for standard APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp "$HOME/.android/debug.keystore" "$RUNNER_TEMP/debug-key-v2.keystore"
+
+      - name: Restore legacy signing key
+        id: legacy-signing-key
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.android
+          key: yandex-home-debug-signing-key-v1
+
+      - name: Build legacy-compatible APK
+        if: steps.legacy-signing-key.outputs.cache-hit == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          legacy_key="$HOME/.android/debug.keystore"
+          legacy_fingerprint="$(keytool -exportcert -keystore "$legacy_key" -storepass android -alias androiddebugkey | sha256sum | awk '{print $1}')"
+          expected_legacy="380579e149bd610f4c5aa48691bd7d7ea872c113075d0c8fcb99845b0603351c"
+          if [[ "$legacy_fingerprint" != "$expected_legacy" ]]; then
+            echo "::error::The cached legacy signing key fingerprint does not match the known 1.4.5–1.4.6 build-51 certificate."
+            echo "Expected: $expected_legacy"
+            echo "Actual:   $legacy_fingerprint"
+            exit 1
+          fi
+          cd "$PROJECT_DIR"
+          gradle --no-daemon -PciBuild=${{ github.run_number }} clean assembleDebug --stacktrace
+          apk="$(find . -type f -path '*/build/outputs/apk/debug/*.apk' -print -quit)"
+          if [[ -z "$apk" ]]; then
+            echo "::error::Legacy-compatible APK not found."
+            exit 1
+          fi
+          legacy_apk="$GITHUB_WORKSPACE/dist/YandexHomeWidgets-${APP_VERSION}-legacy.apk"
+          cp "$apk" "$legacy_apk"
+          actual_cert="$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$legacy_apk" | awk -F': ' '/Signer #1 certificate SHA-256 digest:/ {print tolower($2)}')"
+          if [[ "$actual_cert" != "$expected_legacy" ]]; then
+            echo "::error::Legacy APK signer mismatch."
+            echo "Expected: $expected_legacy"
+            echo "Actual:   $actual_cert"
+            exit 1
+          fi
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$legacy_apk" | grep -F "package: name='ru.dislive.yandexhomewidgets'" >/dev/null
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$legacy_apk" | grep -F "versionName='${APP_VERSION}'" >/dev/null
+          echo "Built legacy-compatible APK: $legacy_apk"
+          echo "Legacy signer SHA-256: $actual_cert"
+
+      - name: Restore current signing key for emulator
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -s "$RUNNER_TEMP/debug-key-v2.keystore" ]]; then
+            cp "$RUNNER_TEMP/debug-key-v2.keystore" "$HOME/.android/debug.keystore"
+          else
+            echo "::error::The current signing key backup is missing."
+            exit 1
+          fi
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: YandexHomeWidgets-${{ env.APP_VERSION }}-apk
+          path: dist/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish update to GitHub Releases
+        if: github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: app-v${{ env.APP_VERSION }}-build-${{ github.run_number }}
+          name: Яндекс Дом ${{ env.APP_VERSION }} · сборка #${{ github.run_number }}
+          body: |
+            APK версии ${{ env.APP_VERSION }}.
+            Версия прочитана из VERSION.txt или установлена в 1.4.6, если файл отсутствует.
+          prerelease: true
+          files: dist/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Install previous release and test update in Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         env:
@@ -322,24 +404,3 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: YandexHomeWidgets-${{ env.APP_VERSION }}-apk
-          path: dist/*.apk
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Publish update to GitHub Releases
-        if: github.event_name != 'pull_request'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: app-v${{ env.APP_VERSION }}-build-${{ github.run_number }}
-          name: Яндекс Дом ${{ env.APP_VERSION }} · сборка #${{ github.run_number }}
-          body: |
-            APK версии ${{ env.APP_VERSION }}.
-            Версия прочитана из VERSION.txt или установлена в 1.4.6, если файл отсутствует.
-          prerelease: true
-          files: dist/*.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
