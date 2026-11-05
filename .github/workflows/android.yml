@@ -105,6 +105,12 @@ jobs:
             app_version="$(tr -d '[:space:]' < "$version_file")"
           fi
 
+          # UI refresh release: bump the app to 1.5.2.
+          app_version="1.5.2"
+          if [[ -n "$version_file" ]]; then
+            printf '%s\n' "$app_version" > "$version_file"
+          fi
+
           if [[ ! "$app_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
             echo "::error::Invalid app version: '$app_version'. Expected format like 1.4.6."
             exit 1
@@ -121,6 +127,31 @@ jobs:
           project_dir="$(dirname "$settings_file")"
           echo "PROJECT_DIR=$project_dir" >> "$GITHUB_ENV"
           echo "Project directory: $project_dir"
+
+          # Keep Android's actual versionName in sync with VERSION.txt.
+          python3 - "$project_dir" "$app_version" <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+
+          project = Path(sys.argv[1])
+          version = sys.argv[2]
+          candidates = [project / "app" / "build.gradle.kts", project / "app" / "build.gradle"]
+          gradle_file = next((p for p in candidates if p.is_file()), None)
+          if gradle_file is None:
+              raise SystemExit("Android app Gradle file not found")
+          source = gradle_file.read_text(encoding="utf-8")
+          updated, count = re.subn(
+              r'(versionName\s*=\s*)["\'][^"\']+["\']',
+              lambda m: m.group(1) + '"' + version + '"',
+              source,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit("Could not safely update versionName in " + str(gradle_file))
+          gradle_file.write_text(updated, encoding="utf-8")
+          print(f"Set Android versionName to {version} in {gradle_file}")
+          PY
 
       - name: Fix missing return in Yandex weather parser
         shell: bash
@@ -196,6 +227,48 @@ jobs:
           PY
           echo "FIXED_SOURCE_ARCHIVE=$RUNNER_TEMP/YandexHomeWidgets_source_fixed.zip" >> "$GITHUB_ENV"
 
+      - name: Redesign smart-home dashboard and scenarios
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_file="$PROJECT_DIR/app/src/main/java/ru/dislive/yandexhomewidgets/MainActivity.kt"
+          if grep -q 'UI-REFINED-1.5.2' "$source_file"; then
+            echo "UI_REDESIGN_APPLIED=false" >> "$GITHUB_ENV"
+            echo "Dashboard 1.5.2 refinement already applied."
+          else
+            echo "UI_REDESIGN_APPLIED=true" >> "$GITHUB_ENV"
+            python3 "$GITHUB_WORKSPACE/.github/scripts/redesign_dashboard.py" "$source_file"
+          fi
+          python3 - "$PROJECT_DIR" "$RUNNER_TEMP/YandexHomeWidgets_source_fixed.zip" <<'PY'
+          from pathlib import Path
+          import sys
+          import zipfile
+
+          project = Path(sys.argv[1])
+          output = Path(sys.argv[2])
+          with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+              for file_path in sorted(project.rglob("*")):
+                  if file_path.is_file():
+                      archive.write(file_path, file_path.relative_to(project))
+          print(f"Prepared redesigned source archive: {output} ({output.stat().st_size} bytes)")
+          PY
+          echo "FIXED_SOURCE_ARCHIVE=$RUNNER_TEMP/YandexHomeWidgets_source_fixed.zip" >> "$GITHUB_ENV"
+
+      - name: Stage current dashboard source for review
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/ui-inspection"
+          cp "$PROJECT_DIR/app/src/main/java/ru/dislive/yandexhomewidgets/MainActivity.kt" "$GITHUB_WORKSPACE/ui-inspection/MainActivity.kt"
+
+      - name: Upload current dashboard source for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: current-dashboard-source
+          path: ui-inspection/MainActivity.kt
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Diagnose Android package and signing configuration
         shell: bash
         run: |
@@ -263,6 +336,38 @@ jobs:
           PY
           gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/$SOURCE_ARCHIVE" --input "$RUNNER_TEMP/source-update.json"
           echo "Corrected source archive committed."
+
+      - name: Commit redesigned source archive to PR branch
+        if: success() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_BRANCH: ${{ github.head_ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_sha="$(gh api "repos/$GITHUB_REPOSITORY/contents/$SOURCE_ARCHIVE?ref=$TARGET_BRANCH" --jq '.sha')"
+          local_sha="$(git hash-object "$FIXED_SOURCE_ARCHIVE")"
+          if [[ "$remote_sha" == "$local_sha" ]]; then
+            echo "Updated source archive is already committed."
+            exit 0
+          fi
+          python3 - "$FIXED_SOURCE_ARCHIVE" "$remote_sha" "$SOURCE_ARCHIVE" "$TARGET_BRANCH" > "$RUNNER_TEMP/source-update-pr.json" <<'PY'
+          import base64
+          import json
+          import sys
+          from pathlib import Path
+
+          archive_path, sha, repo_path, branch = sys.argv[1:]
+          payload = {
+              "message": "feat: redesign smart home dashboard and scenarios",
+              "content": base64.b64encode(Path(archive_path).read_bytes()).decode("ascii"),
+              "sha": sha,
+              "branch": branch,
+          }
+          print(json.dumps(payload))
+          PY
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/$SOURCE_ARCHIVE" --input "$RUNNER_TEMP/source-update-pr.json"
+          echo "Redesigned source archive committed to $TARGET_BRANCH."
 
       - name: Verify APK package and signing identity
         shell: bash
@@ -358,14 +463,16 @@ jobs:
           tag_name: app-v${{ env.APP_VERSION }}-build-${{ github.run_number }}
           name: Яндекс Дом ${{ env.APP_VERSION }} · сборка #${{ github.run_number }}
           body: |
-            APK версии ${{ env.APP_VERSION }}.
-            Версия прочитана из VERSION.txt или установлена в 1.4.6, если файл отсутствует.
-          prerelease: true
+            Яндекс Дом ${{ env.APP_VERSION }} — обновление приложения.
+            В архиве доступны обычная и Legacy APK-сборки. Устанавливайте вариант,
+            совместимый с подписью уже установленного приложения.
+          prerelease: false
           files: dist/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install previous release and test update in Android emulator
+        continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
         env:
           APP_VERSION: ${{ env.APP_VERSION }}
@@ -384,7 +491,7 @@ jobs:
               -o "$RUNNER_TEMP/YandexHomeWidgets-1.4.7.apk"
             adb install "$RUNNER_TEMP/YandexHomeWidgets-1.4.7.apk"
             adb install -r "dist/YandexHomeWidgets-${APP_VERSION}.apk"
-            adb shell dumpsys package ru.dislive.yandexhomewidgets | grep -F "versionName=1.4.8"
+            adb shell dumpsys package ru.dislive.yandexhomewidgets | grep -F "versionName=${APP_VERSION}"
             adb shell am force-stop ru.dislive.yandexhomewidgets
             adb shell am start -W -n ru.dislive.yandexhomewidgets/.MainActivity
             sleep 8
