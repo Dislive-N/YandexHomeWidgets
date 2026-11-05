@@ -590,6 +590,16 @@ private fun CompactDeviceTile(
                         'primary = Color(0xFFA78BFA).copy(alpha = 0.78f + glassOpacity * 0.20f),', 1)
     main = main.replace('secondary = Color(0xFF14B8A6).copy(alpha = 0.86f + glassOpacity * 0.14f),',
                         'secondary = Color(0xFF35CFA7).copy(alpha = 0.86f + glassOpacity * 0.14f),', 1)
+    main = main.replace(
+        'val activeCount = devices.count { it.onOff == true }',
+        'val activeCount = devices.count { it.isOnline && it.onOff == true }',
+        1
+    )
+    main = main.replace(
+        'selected = page == AppPage.HOME,',
+        'selected = page in setOf(AppPage.HOME, AppPage.DEVICE, AppPage.GROUP_DETAILS, AppPage.ANALYTICS),',
+        1
+    )
     main_path.write_text(main, encoding="utf-8")
 else:
     print("Dashboard 1.5.2 visual refinement already present.")
