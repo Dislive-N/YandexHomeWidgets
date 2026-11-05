@@ -1,0 +1,34 @@
+name: Verify UI 1.5.0 compilation
+
+on:
+  push:
+    branches: ["feature-ui-adjustments"]
+    paths: [".github/workflows/verify-ui-150.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature-ui-adjustments
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Extract source and verify version
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir unpacked
+          unzip -q YandexHomeWidgets_source.zip -d unpacked
+          test "$(tr -d '[:space:]' < unpacked/VERSION.txt)" = "1.5.0"
+          grep -F 'versionName = "1.5.0"' unpacked/app/build.gradle.kts
+      - name: Compile Android app
+        working-directory: unpacked
+        run: gradle --no-daemon :app:assembleDebug --stacktrace
