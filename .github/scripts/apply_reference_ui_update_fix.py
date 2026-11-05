@@ -239,4 +239,358 @@ main = main.replace(
 )
 main_path.write_text(main, encoding="utf-8")
 
+
+# 1.5.2: a cohesive room-first dashboard and a clearer device-card system.
+main = main_path.read_text(encoding="utf-8")
+if 'key = "dashboard_hero"' not in main:
+    main = main.replace('AppPage.HOME -> "Дом"', 'AppPage.HOME -> "Мой дом"')
+    start_marker = '        item(span = { GridItemSpan(maxLineSpan) }, key = "home_status_strip") {\n'
+    end_marker = '        item(span = { GridItemSpan(maxLineSpan) }, key = "location_weather") {\n'
+    start = main.find(start_marker)
+    end = main.find(end_marker, start)
+    if start < 0 or end <= start:
+        raise SystemExit("Could not locate home status strip for dashboard hero")
+    hero = '''        item(span = { GridItemSpan(maxLineSpan) }, key = "dashboard_hero") {
+            Column(
+                modifier = Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(26.dp))
+                    .background(Brush.linearGradient(listOf(Color(0xFF302B42), Color(0xFF242C3A), Color(0xFF202D35))))
+                    .border(1.dp, Color.White.copy(alpha = 0.09f), RoundedCornerShape(26.dp))
+                    .padding(horizontal = 17.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(13.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("СОСТОЯНИЕ ДОМА", color = Color.White.copy(alpha = 0.66f), fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
+                        Text(
+                            when {
+                                devices.isEmpty() -> "Подключи свой дом"
+                                offlineCount > 0 -> "Есть устройства без связи"
+                                else -> "Дома всё спокойно"
+                            },
+                            color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis
+                        )
+                        Text(activeCount.toString() + " включено · " + onlineCount + " в сети из " + devices.size, color = Color.White.copy(alpha = 0.76f), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    Box(Modifier.size(54.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.10f)), contentAlignment = Alignment.Center) {
+                        SmartGlyph("home", Modifier.size(27.dp), Color(0xFFD8C8FF))
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    DashboardStat("Включено", activeCount.toString(), Modifier.weight(1f))
+                    DashboardStat("В сети", onlineCount.toString(), Modifier.weight(1f))
+                    DashboardStat(if (offlineCount > 0) "Без связи" else "Стабильно", if (offlineCount > 0) offlineCount.toString() else "OK", Modifier.weight(1f))
+                }
+            }
+        }
+'''
+    main = main[:start] + hero + main[end:]
+
+    old_filter = '''    val visibleDevices = remember(devices, selectedCategory) {
+        when (selectedCategory) {
+            "Все" -> devices
+            "Проблемы" -> devices.filterNot { it.isOnline }
+            "Свет" -> devices.filter { dashboardDeviceCategory(it) == "Освещение" }
+            else -> devices.filter { dashboardDeviceCategory(it) == selectedCategory }
+        }
+    }
+'''
+    new_filter = '''    val visibleDevices = remember(devices, selectedCategory) {
+        when (selectedCategory) {
+            "Все" -> devices
+            "Не в сети" -> devices.filterNot { it.isOnline }
+            "Избранное" -> devices.filter { it.isFavorite }
+            "Свет", "Освещение" -> devices.filter { dashboardDeviceCategory(it) == "Освещение" }
+            else -> devices.filter { dashboardDeviceCategory(it) == selectedCategory }
+        }
+    }
+'''
+    if old_filter in main:
+        main = main.replace(old_filter, new_filter, 1)
+    elif new_filter not in main:
+        raise SystemExit("Could not update dashboard device filters")
+    main = main.replace('    val favoriteDevices = visibleDevices.filter { it.isFavorite }',
+                        '    val favoriteDevices = remember(devices) { devices.filter { it.isFavorite } }', 1)
+
+    actions_start = '        item(span = { GridItemSpan(maxLineSpan) }, key = "home_actions") {\n'
+    actions_end = '        item(span = { GridItemSpan(maxLineSpan) }, key = "device_categories") {\n'
+    start = main.find(actions_start)
+    end = main.find(actions_end, start)
+    if start < 0 or end <= start:
+        raise SystemExit("Could not locate dashboard quick actions")
+    quick_actions = '''        item(span = { GridItemSpan(maxLineSpan) }, key = "home_actions") {
+            val lights = devices.filter { dashboardDeviceCategory(it) == "Освещение" && it.canToggle && it.isOnline }
+            val outlets = devices.filter { dashboardDeviceCategory(it) == "Розетки" && it.canToggle && it.isOnline }
+            val allLightsOn = lights.isNotEmpty() && lights.all { it.onOff == true }
+            val allOutletsOn = outlets.isNotEmpty() && outlets.all { it.onOff == true }
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                HomeQuickButton(if (allLightsOn) "Выключить свет" else "Включить свет", Color(0xFF9B7BFA),
+                    { onToggleGroup(lights, !allLightsOn) }, Modifier.widthIn(min = 126.dp), enabled = lights.isNotEmpty() && !isBusy)
+                HomeQuickButton(if (allOutletsOn) "Выключить розетки" else "Включить розетки", Color(0xFF42BFA5),
+                    { onToggleGroup(outlets, !allOutletsOn) }, Modifier.widthIn(min = 142.dp), enabled = outlets.isNotEmpty() && !isBusy)
+                HomeQuickButton("Группы", Color(0xFF658EDB), onOpenGroups, Modifier.widthIn(min = 98.dp))
+                HomeQuickButton("Аналитика", Color(0xFF8D83BD), onAnalytics, Modifier.widthIn(min = 112.dp))
+            }
+        }
+'''
+    main = main[:start] + quick_actions + main[end:]
+
+    old_categories = '''                listOf("Все", "Проблемы", "Свет", "Розетки", "Климат", "Безопасность", "Датчики", "Другое").forEach { category ->
+                    val count = when (category) {
+                        "Все" -> devices.size
+                        "Проблемы" -> offlineCount
+                        "Свет" -> devices.count { dashboardDeviceCategory(it) == "Освещение" }
+                        else -> devices.count { dashboardDeviceCategory(it) == category }
+                    }
+'''
+    new_categories = '''                listOf("Все", "Не в сети", "Избранное", "Освещение", "Розетки", "Климат", "Безопасность", "Датчики", "Медиа", "Другое").forEach { category ->
+                    val count = when (category) {
+                        "Все" -> devices.size
+                        "Не в сети" -> offlineCount
+                        "Избранное" -> favoriteDevices.size
+                        else -> devices.count { dashboardDeviceCategory(it) == category }
+                    }
+'''
+    if old_categories in main:
+        main = main.replace(old_categories, new_categories, 1)
+    elif new_categories not in main:
+        raise SystemExit("Could not update dashboard category chips")
+
+    fav_start = '            if (favoriteDevices.isNotEmpty() && selectedCategory == "Все") {\n'
+    fav_end = '            item(span = { GridItemSpan(maxLineSpan) }, key = "devices_section_header") {\n'
+    start = main.find(fav_start)
+    end = main.find(fav_end, start)
+    if start < 0 or end <= start:
+        raise SystemExit("Could not locate favourites section")
+    favorites = '''            if (favoriteDevices.isNotEmpty() && selectedCategory == "Все") {
+                item(span = { GridItemSpan(maxLineSpan) }, key = "favorites_shelf") {
+                    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Избранное", fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                            Text(favoriteDevices.size.toString(), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.58f), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        }
+                        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            favoriteDevices.forEach { device ->
+                                Box(Modifier.width(cardWidthDp.dp)) {
+                                    CompactDeviceTile(
+                                        device = device, enabled = !isBusy && device.id !in pendingDeviceIds,
+                                        pending = device.id in pendingDeviceIds, cardSize = "small",
+                                        cardWidthDp = cardWidthDp, cardHeightDp = cardHeightDp.coerceAtMost(164),
+                                        onFavorite = { onFavoriteChange(device, it) }, onOpen = { onOpenDevice(device) },
+                                        onToggle = { onToggle(device, it) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+'''
+    main = main[:start] + favorites + main[end:]
+
+    # Replace the room title row by locating it relative to its room data binding.
+    room_anchor = 'val roomDevices = ungroupedByRoom[roomName].orEmpty()'
+    room_at = main.find(room_anchor)
+    room_start = main.find('                        Row(modifier = Modifier.fillMaxWidth().padding(top = 7.dp)', room_at)
+    room_end = main.find('\n                        }\n', room_start)
+    if room_at < 0 or room_start < 0 or room_end < 0:
+        raise SystemExit("Could not locate room header")
+    room_end += len('\n                        }\n')
+    room_header = '''                        val switchableRoomDevices = roomDevices.filter { it.canToggle && it.isOnline }
+                        val roomIsOn = switchableRoomDevices.isNotEmpty() && switchableRoomDevices.all { it.onOff == true }
+                        val roomHasPending = switchableRoomDevices.any { it.id in pendingDeviceIds }
+                        Row(Modifier.fillMaxWidth().padding(top = 9.dp, bottom = 1.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(roomName, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                Text(roomDevices.size.toString() + " устройств", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.56f), fontSize = 11.sp)
+                            }
+                            if (switchableRoomDevices.isNotEmpty()) {
+                                TextButton(
+                                    onClick = { onToggleGroup(switchableRoomDevices, !roomIsOn) },
+                                    enabled = !isBusy && !roomHasPending,
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp)
+                                ) {
+                                    Text(if (roomIsOn) "Выключить всё" else "Включить всё", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                }
+                            }
+                        }
+'''
+    main = main[:room_start] + room_header + main[room_end:]
+
+    quick_start = '@Composable\nprivate fun HomeQuickButton('
+    quick_end = '\n@Composable\nprivate fun HistoryQuickButton('
+    start = main.find(quick_start)
+    end = main.find(quick_end, start)
+    if start < 0 or end <= start:
+        raise SystemExit("Could not locate HomeQuickButton")
+    quick_helper = '''@Composable
+private fun HomeQuickButton(
+    title: String,
+    tint: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
+) {
+    OutlinedButton(
+        onClick = onClick, enabled = enabled, modifier = modifier.height(42.dp),
+        shape = RoundedCornerShape(15.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, tint.copy(alpha = if (enabled) 0.42f else 0.15f)),
+        contentPadding = PaddingValues(horizontal = 13.dp, vertical = 5.dp),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = tint, disabledContentColor = tint.copy(alpha = 0.42f))
+    ) {
+        Text(title, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+'''
+    main = main[:start] + quick_helper + main[end:]
+
+    main = main.replace(
+        'Text(label, color = Color.White.copy(alpha = 0.68f), fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp, maxLines = 1)',
+        'Text(label, color = Color.White.copy(alpha = 0.72f), fontSize = 9.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)',
+        1
+    )
+
+    tile_start = '@Composable\nprivate fun CompactDeviceTile('
+    tile_end = '\nprivate fun deviceIcon(type:'
+    start = main.find(tile_start)
+    end = main.find(tile_end, start)
+    if start < 0 or end <= start:
+        raise SystemExit("Could not locate CompactDeviceTile")
+    tile = '''@Composable
+private fun CompactDeviceTile(
+    device: HomeDevice,
+    enabled: Boolean,
+    pending: Boolean,
+    cardSize: String,
+    cardWidthDp: Int,
+    cardHeightDp: Int,
+    onFavorite: (Boolean) -> Unit,
+    onOpen: () -> Unit,
+    onToggle: (Boolean) -> Unit
+) {
+    val on = device.onOff == true
+    val offline = !device.isOnline
+    val iconSize = when (cardSize) { "large" -> 68.dp; "small" -> 48.dp; else -> 58.dp }
+    val powerSize = when (cardSize) { "large" -> 48.dp; "small" -> 36.dp; else -> 42.dp }
+    val titleSize = when (cardSize) { "large" -> 16.sp; "small" -> 13.sp; else -> 14.sp }
+    val cardShape = RoundedCornerShape(22.dp)
+    val tileColor = when { offline -> Color(0xFF332A32); on -> Color(0xFF302D3D); else -> Color(0xFF292D37) }
+    val outline = when {
+        offline -> Color(0xFFFF6578).copy(alpha = 0.34f)
+        on -> Color(0xFF9B7BFA).copy(alpha = 0.34f)
+        else -> Color.White.copy(alpha = 0.055f)
+    }
+    val statusColor = when { offline -> Color(0xFFFF6477); on -> Color(0xFF53D6A7); else -> Color(0xFF9CA4B2) }
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+        Box(
+            modifier = Modifier.widthIn(max = cardWidthDp.dp).fillMaxWidth()
+                .height(cardHeightDp.coerceIn(148, 280).dp)
+                .clip(cardShape).background(tileColor).border(1.dp, outline, cardShape)
+                .clickable(onClick = onOpen)
+                .padding(if (cardSize == "large") 15.dp else 13.dp)
+        ) {
+            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                    Box(
+                        Modifier.size(iconSize + 8.dp).clip(RoundedCornerShape(19.dp))
+                            .background(if (offline) Color.White.copy(alpha = 0.045f) else if (on) Color(0xFF9B7BFA).copy(alpha = 0.15f) else Color.White.copy(alpha = 0.055f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        SmartGlyph(deviceIconKind(device.type, device.name), Modifier.size(iconSize),
+                            if (offline) Color(0xFF9298A5) else if (on) Color(0xFFD2C2FF) else Color(0xFFB8BFCC))
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Box(
+                            Modifier.size(36.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.055f))
+                                .clickable { onFavorite(!device.isFavorite) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(if (device.isFavorite) "★" else "☆",
+                                color = if (device.isFavorite) Color(0xFFFFD166) else Color.White.copy(alpha = 0.56f), fontSize = 19.sp)
+                        }
+                        if (device.canToggle) {
+                            Box(
+                                Modifier.size(powerSize).clip(CircleShape)
+                                    .background(when { offline -> Color(0xFF4A4650); on -> Color(0xFF8059E8); else -> Color(0xFF414653) })
+                                    .clickable(enabled = enabled && !offline) { onToggle(!on) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (pending) CircularProgressIndicator(Modifier.size(19.dp), strokeWidth = 2.dp, color = Color.White)
+                                else SmartGlyph(if (on) "off" else "power", Modifier.size(24.dp), Color.White)
+                            }
+                        }
+                    }
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(device.name, color = Color(0xFFF3F4F8), fontWeight = FontWeight.Bold,
+                        fontSize = titleSize, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Box(Modifier.size(7.dp).clip(CircleShape).background(statusColor))
+                        Text(
+                            when {
+                                offline -> "Не в сети"
+                                pending && on -> "Включение…"
+                                pending && !on -> "Выключение…"
+                                on -> "Включено"
+                                device.onOff == false -> "Выключено"
+                                else -> "Готово к управлению"
+                            },
+                            color = if (offline) Color(0xFFFF7888) else Color.White.copy(alpha = 0.72f),
+                            fontSize = 10.sp, fontWeight = if (offline || on) FontWeight.SemiBold else FontWeight.Normal,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
+                        )
+                        if (device.room.isNotBlank()) Text(device.room, color = Color.White.copy(alpha = 0.44f),
+                            fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+        }
+    }
+}
+'''
+    main = main[:start] + tile + main[end:]
+
+    main = main.replace(
+        'if (isConnected && page in setOf(AppPage.HOME, AppPage.SCENARIOS, AppPage.DEVICE, AppPage.GROUP_DETAILS, AppPage.ANALYTICS)) {',
+        'if (isConnected && page in setOf(AppPage.HOME, AppPage.SCENARIOS, AppPage.HISTORY, AppPage.DEVICE, AppPage.GROUP_DETAILS, AppPage.ANALYTICS)) {',
+        1
+    )
+    nav_tail = '''                        NavigationBarItem(
+                            selected = page == AppPage.SCENARIOS,
+                            onClick = { page = AppPage.SCENARIOS },
+                            icon = { SmartGlyph("sparkles", Modifier.size(22.dp), Color.White.copy(alpha = if (page == AppPage.SCENARIOS) 1f else 0.72f)) }, label = { Text("Сценарии") },
+                            colors = NavigationBarItemDefaults.colors(selectedIconColor = Color.White, selectedTextColor = Color.White, unselectedIconColor = Color.White.copy(alpha = 0.72f), unselectedTextColor = Color.White.copy(alpha = 0.72f), indicatorColor = Color.White.copy(alpha = 0.14f))
+                        )
+'''
+    nav_add = nav_tail + '''                        NavigationBarItem(
+                            selected = page == AppPage.HISTORY,
+                            onClick = { history = HomeHistoryStore.load(context); page = AppPage.HISTORY },
+                            icon = { SmartGlyph("clock", Modifier.size(22.dp), Color.White.copy(alpha = if (page == AppPage.HISTORY) 1f else 0.72f)) },
+                            label = { Text("История") },
+                            colors = NavigationBarItemDefaults.colors(selectedIconColor = Color.White, selectedTextColor = Color.White, unselectedIconColor = Color.White.copy(alpha = 0.72f), unselectedTextColor = Color.White.copy(alpha = 0.72f), indicatorColor = Color.White.copy(alpha = 0.14f))
+                        )
+'''
+    if nav_tail in main:
+        main = main.replace(nav_tail, nav_add, 1)
+    elif 'selected = page == AppPage.HISTORY' not in main:
+        raise SystemExit("Could not add history destination to bottom navigation")
+
+    main = main.replace('listOf(Color(0xFF101C2B), Color(0xFF142B3A), Color(0xFF101B2A))',
+                        'listOf(Color(0xFF22242D), Color(0xFF292B36), Color(0xFF20232C))', 1)
+    main = main.replace(
+        'background = Color(0xFF1C1D25),\n        surface = Color(0xFF2D3039).copy(alpha = glassOpacity),\n        surfaceVariant = Color(0xFF363943).copy(alpha = glassOpacity * 0.94f),',
+        'background = Color(0xFF171922),\n        surface = Color(0xFF272B35).copy(alpha = glassOpacity),\n        surfaceVariant = Color(0xFF303642).copy(alpha = glassOpacity * 0.94f),', 1
+    )
+    main = main.replace('primary = Color(0xFFB5A0FF).copy(alpha = 0.78f + glassOpacity * 0.20f),',
+                        'primary = Color(0xFFA78BFA).copy(alpha = 0.78f + glassOpacity * 0.20f),', 1)
+    main = main.replace('secondary = Color(0xFF14B8A6).copy(alpha = 0.86f + glassOpacity * 0.14f),',
+                        'secondary = Color(0xFF35CFA7).copy(alpha = 0.86f + glassOpacity * 0.14f),', 1)
+    main_path.write_text(main, encoding="utf-8")
+else:
+    print("Dashboard 1.5.2 visual refinement already present.")
+
+
 print("Applied reference-style home screen, bold headings, and signature-aware update selection.")
