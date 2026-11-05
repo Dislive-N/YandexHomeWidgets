@@ -206,8 +206,8 @@ with tempfile.TemporaryDirectory() as td:
         raise SystemExit("Automation card switch not found uniquely")
     info_button = '                        TextButton(onClick = { infoAutomation = automation }, modifier = Modifier.size(34.dp), contentPadding = PaddingValues(0.dp)) { Text("i", fontSize = 17.sp, fontWeight = FontWeight.Bold) }\n'
     scenario = scenario.replace(switch_line, info_button + switch_line, 1)
-    scenario, cond_count = re.subn(r'(?m)^\\s*Text\\(automation\\.conditions\\.joinToString.*\\n', '', scenario)
-    scenario, act_count = re.subn(r'(?m)^\\s*Text\\("Тогда: " \\+ automation\\.actions\\.joinToString.*\\n', '', scenario)
+    scenario, cond_count = re.subn(r'(?m)^\s*Text\(automation\.conditions\.joinToString.*\n', '', scenario)
+    scenario, act_count = re.subn(r'(?m)^\s*Text\("Тогда: " \+ automation\.actions\.joinToString.*\n', '', scenario)
     if cond_count != 1 or act_count != 1:
         raise SystemExit(f"Scenario descriptions not found uniquely: conditions={cond_count}, actions={act_count}")
     info_dialog = '''    infoAutomation?.let { detail ->
