@@ -335,6 +335,7 @@ fun ApplyGlassDialogBackdropBlur() {
 ''', encoding="utf-8")
 
     # Verify every power command path is unchanged.
+    tile_click = protected[0]
     if tile_click not in main:
         raise SystemExit("Tile power click was modified")
     after = re.search(r"(?ms)^    fun performOnOff\(deviceIds: List<String>, value: Boolean\) \{.*?^\s{4}\}", main)
