@@ -94,6 +94,7 @@ jobs:
             echo "::error::Invalid app version: '$app_version'. Expected format like 1.4.6."
             exit 1
           fi
+          echo "SOURCE_ARCHIVE=$archive" >> "$GITHUB_ENV"
           echo "APP_VERSION=$app_version" >> "$GITHUB_ENV"
           echo "App version: $app_version"
 
@@ -106,17 +107,36 @@ jobs:
           echo "PROJECT_DIR=$project_dir" >> "$GITHUB_ENV"
           echo "Project directory: $project_dir"
 
-      - name: Inspect LocationWeather compile error
+      - name: Fix missing return in Yandex weather parser
         shell: bash
         run: |
           set -euo pipefail
-          source_file="$(find unpacked -type f -name LocationWeather.kt -print -quit)"
-          if [[ -z "$source_file" ]]; then
-            echo "::error::LocationWeather.kt not found in extracted source."
-            exit 1
-          fi
-          echo "Source file: $source_file"
-          nl -ba "$source_file" | sed -n '130,190p'
+          source_file="$PROJECT_DIR/app/src/main/java/ru/dislive/yandexhomewidgets/data/LocationWeather.kt"
+          python3 - "$source_file" "$RUNNER_TEMP/YandexHomeWidgets_source_fixed.zip" <<'PY'
+          from pathlib import Path
+          import sys
+          import zipfile
+
+          source = Path(sys.argv[1])
+          fixed_archive = Path(sys.argv[2])
+          content = source.read_text(encoding="utf-8")
+          old = "                CurrentWeather(\n                    temperatureC = temp,"
+          new = "                return CurrentWeather(\n                    temperatureC = temp,"
+          count = content.count(old)
+          if count != 1:
+              raise SystemExit(f"Expected exactly one Yandex parser expression to patch, found {count}")
+          source.write_text(content.replace(old, new, 1), encoding="utf-8")
+          print(f"Patched {source}: explicit return added to parseYandex")
+
+          project_dir = source.parents[5]
+          # Rebuild the source archive before Gradle adds build outputs and caches.
+          with zipfile.ZipFile(fixed_archive, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+              for path in project_dir.rglob("*"):
+                  if path.is_file():
+                      archive.write(path, path.relative_to(project_dir))
+          print(f"Prepared corrected source archive: {fixed_archive} ({fixed_archive.stat().st_size} bytes)")
+          PY
+          echo "FIXED_SOURCE_ARCHIVE=$RUNNER_TEMP/YandexHomeWidgets_source_fixed.zip" >> "$GITHUB_ENV"
 
       - name: Build debug APK
         shell: bash
@@ -131,6 +151,33 @@ jobs:
           fi
           mkdir -p "$GITHUB_WORKSPACE/dist"
           cp "$apk" "$GITHUB_WORKSPACE/dist/YandexHomeWidgets-${APP_VERSION}.apk"
+
+      - name: Update source archive with the verified fix
+        if: success() && github.event_name != 'pull_request'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive_sha="$(gh api "repos/$GITHUB_REPOSITORY/contents/$SOURCE_ARCHIVE?ref=main" --jq '.sha')"
+          python3 - "$FIXED_SOURCE_ARCHIVE" "$archive_sha" "$SOURCE_ARCHIVE" > "$RUNNER_TEMP/source-update.json" <<'PY'
+          import base64
+          import json
+          import sys
+          from pathlib import Path
+
+          archive_path, sha, repo_path = sys.argv[1:]
+          payload = {
+              "message": "fix: add explicit return in Yandex weather parser",
+              "content": base64.b64encode(Path(archive_path).read_bytes()).decode("ascii"),
+              "sha": sha,
+              "branch": "main",
+          }
+          print(json.dumps(payload))
+          PY
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/$SOURCE_ARCHIVE" --input "$RUNNER_TEMP/source-update.json"
+          echo "Corrected source archive committed."
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
