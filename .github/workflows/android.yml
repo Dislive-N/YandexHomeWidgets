@@ -232,9 +232,9 @@ jobs:
         run: |
           set -euo pipefail
           source_file="$PROJECT_DIR/app/src/main/java/ru/dislive/yandexhomewidgets/MainActivity.kt"
-          if grep -q 'Text("СОСТОЯНИЕ ДОМА"' "$source_file"; then
+          if grep -q 'UI-REFINED-1.5.2' "$source_file"; then
             echo "UI_REDESIGN_APPLIED=false" >> "$GITHUB_ENV"
-            echo "Dashboard already redesigned."
+            echo "Dashboard 1.5.2 refinement already applied."
           else
             echo "UI_REDESIGN_APPLIED=true" >> "$GITHUB_ENV"
             python3 "$GITHUB_WORKSPACE/.github/scripts/redesign_dashboard.py" "$source_file"
