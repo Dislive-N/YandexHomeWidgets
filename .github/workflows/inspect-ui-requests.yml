@@ -1,0 +1,40 @@
+name: Inspect requested UI areas
+
+on:
+  push:
+    branches: ["feature-ui-adjustments"]
+    paths: [".github/workflows/inspect-ui-requests.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract current source and inspect UI
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d _transport/source.zip.b64 > /tmp/source.zip
+          mkdir -p /tmp/source
+          unzip -q /tmp/source.zip -d /tmp/source
+          main="/tmp/source/app/src/main/java/ru/dislive/yandexhomewidgets/MainActivity.kt"
+          echo "=== FILES AND VERSION ==="
+          cat /tmp/source/VERSION.txt
+          grep -nE 'versionName|versionCode' /tmp/source/app/build.gradle.kts
+          echo "=== ALL COMPOSABLE DECLARATIONS ==="
+          grep -nE '^private fun .*Screen\(|^private fun .*Card\(|^private fun .*Tile\(|^private fun .*Action\(|^private fun SettingsScreen\(|^private fun HomeScreen\(' "$main"
+          echo "=== HOME SCREEN FULL ==="
+          sed -n '820,1260p' "$main"
+          echo "=== SETTINGS SCREEN FULL ==="
+          sed -n '2050,2245p' "$main"
+          echo "=== SCENARIO CENTER ENTRY POINTS ==="
+          grep -RniE --include='*.kt' 'class ScenarioCenter|fun ScenarioCenter|Все действия|Действия|Action' /tmp/source/app/src/main/java/ru/dislive/yandexhomewidgets | head -240
+          echo "=== ROOT APP SHELL AND MAIN NAVIGATION ==="
+          sed -n '380,810p' "$main"
+          echo "=== VERSION/AUTO UPDATE REFERENCES ==="
+          grep -n -B 5 -A 12 -E 'checkUpdates\(|LaunchedEffect\(Unit\)|AppUpdateChecker|auto.?update|updateInfo' "$main"
+          echo "=== GRADLE CONFIG ==="
+          sed -n '1,80p' /tmp/source/app/build.gradle.kts
