@@ -13,8 +13,6 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      APP_VERSION: "1.4.5"
 
     steps:
       - name: Checkout repository
@@ -62,7 +60,7 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Find and extract Android project
+      - name: Find, extract project and read version from archive
         shell: bash
         run: |
           set -euo pipefail
@@ -80,8 +78,23 @@ jobs:
             echo "::error::Gradle project archive not found."
             exit 1
           fi
+
           mkdir -p unpacked
           unzip -q "$archive" -d unpacked
+
+          version_file="$(find unpacked -type f -name VERSION.txt -print -quit)"
+          if [[ -z "$version_file" ]]; then
+            echo "::error::VERSION.txt not found inside source archive. Put the app version in VERSION.txt, for example 1.4.6."
+            exit 1
+          fi
+          app_version="$(tr -d '[:space:]' < "$version_file")"
+          if [[ ! "$app_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Invalid version in $version_file: '$app_version'. Expected format like 1.4.6."
+            exit 1
+          fi
+          echo "APP_VERSION=$app_version" >> "$GITHUB_ENV"
+          echo "App version from archive: $app_version"
+
           settings_file="$(find "$GITHUB_WORKSPACE/unpacked" -type f \( -name settings.gradle -o -name settings.gradle.kts \) -print -quit)"
           if [[ -z "$settings_file" ]]; then
             echo "::error::Gradle settings file not found."
@@ -103,13 +116,13 @@ jobs:
             exit 1
           fi
           mkdir -p "$GITHUB_WORKSPACE/dist"
-          cp "$apk" "$GITHUB_WORKSPACE/dist/app-debug.apk"
+          cp "$apk" "$GITHUB_WORKSPACE/dist/YandexHomeWidgets-${APP_VERSION}.apk"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: YandexHomeWidgets-debug-apk
-          path: dist/app-debug.apk
+          name: YandexHomeWidgets-${{ env.APP_VERSION }}-apk
+          path: dist/*.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -121,17 +134,8 @@ jobs:
           name: Яндекс Дом ${{ env.APP_VERSION }} · сборка #${{ github.run_number }}
           body: |
             APK версии ${{ env.APP_VERSION }}.
-
-            - Затемнён градиент нижней навигации.
-            - Увеличены значки устройств и кнопки включения/выключения; кнопка корректно обрезается по круглой форме, значок имеет больший внутренний отступ.
-            - В редакторе локальных сценариев сначала выбирается устройство, затем вкладка изменения: питание, яркость, цвет или режим — только то, что поддерживается выбранным устройством.
-            - Геозона: настроен HTTPS-источник тайлов OpenStreetMap, внутренний кэш карты и проверка сетевого подключения.
-            - В погодной карточке явно указан источник Open-Meteo. Его прогноз может отличаться от Яндекс Погоды; для точного совпадения нужен отдельный ключ официального API Яндекс Погоды.
-
-            Фоновые правила проверяются WorkManager после обычного закрытия приложения. Android может задерживать периодическую задачу (минимальный интервал 15 минут); принудительная остановка приложения блокирует её до следующего запуска. Для фоновых геозон требуется разрешение «Местоположение — Разрешить всегда».
-
-            Предложения сценариев анализируют фактические возможности устройств локально на телефоне; это не облачная генеративная ИИ-модель. Предложенные правила добавляются выключенными.
+            Версия автоматически прочитана из VERSION.txt внутри исходного архива.
           prerelease: true
-          files: dist/app-debug.apk
+          files: dist/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
