@@ -105,6 +105,12 @@ jobs:
             app_version="$(tr -d '[:space:]' < "$version_file")"
           fi
 
+          # Release request: bump the app to 1.5.1.
+          app_version="1.5.1"
+          if [[ -n "$version_file" ]]; then
+            printf '%s\n' "$app_version" > "$version_file"
+          fi
+
           if [[ ! "$app_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
             echo "::error::Invalid app version: '$app_version'. Expected format like 1.4.6."
             exit 1
@@ -121,6 +127,31 @@ jobs:
           project_dir="$(dirname "$settings_file")"
           echo "PROJECT_DIR=$project_dir" >> "$GITHUB_ENV"
           echo "Project directory: $project_dir"
+
+          # Keep Android's actual versionName in sync with VERSION.txt.
+          python3 - "$project_dir" "$app_version" <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+
+          project = Path(sys.argv[1])
+          version = sys.argv[2]
+          candidates = [project / "app" / "build.gradle.kts", project / "app" / "build.gradle"]
+          gradle_file = next((p for p in candidates if p.is_file()), None)
+          if gradle_file is None:
+              raise SystemExit("Android app Gradle file not found")
+          source = gradle_file.read_text(encoding="utf-8")
+          updated, count = re.subn(
+              r'(versionName\\s*=\\s*)["\'][^"\']+["\']',
+              lambda m: m.group(1) + '"' + version + '"',
+              source,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit("Could not safely update versionName in " + str(gradle_file))
+          gradle_file.write_text(updated, encoding="utf-8")
+          print(f"Set Android versionName to {version} in {gradle_file}")
+          PY
 
       - name: Fix missing return in Yandex weather parser
         shell: bash
