@@ -1,0 +1,30 @@
+name: Apply final UI refinements 1.5.0
+
+on:
+  push:
+    branches: ["smart-home-1.5.0"]
+    paths:
+      - ".github/workflows/apply-final-ui.yml"
+      - "tools/refine_ui_150.py"
+
+permissions:
+  contents: write
+
+jobs:
+  refine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: smart-home-1.5.0
+          fetch-depth: 0
+      - name: Apply targeted UI refinements
+        run: python3 tools/refine_ui_150.py
+      - name: Commit source archive
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add YandexHomeWidgets_source.zip
+          git commit -m "fix: improve dark text contrast and adaptive device card sizing"
+          git push origin smart-home-1.5.0
