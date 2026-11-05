@@ -1,0 +1,33 @@
+name: Apply lightweight glass UI
+
+on:
+  push:
+    branches: ["ui-glassmorphism"]
+    paths:
+      - ".github/workflows/apply-glass-theme.yml"
+      - "tools/apply_glass_theme.py"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: ui-glassmorphism
+          fetch-depth: 0
+      - name: Apply visual-only changes and verify power controls
+        run: python3 tools/apply_glass_theme.py YandexHomeWidgets_source.zip
+      - name: Commit updated source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add YandexHomeWidgets_source.zip
+          git commit -m "feat: apply lightweight glassmorphism UI (1.4.9)"
+          git push origin ui-glassmorphism
