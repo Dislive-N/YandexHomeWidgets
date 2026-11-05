@@ -283,6 +283,45 @@ jobs:
           echo "Verified version: ${APP_VERSION}"
           echo "Verified signer SHA-256: $signer"
 
+      - name: Install previous release and test update in Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          APP_VERSION: ${{ env.APP_VERSION }}
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot
+          script: |
+            set -euo pipefail
+            adb wait-for-device
+            curl -fsSL --retry 3 --retry-delay 2 \
+              "https://github.com/Dislive-N/YandexHomeWidgets/releases/download/app-v1.4.7-build-57/YandexHomeWidgets-1.4.7.apk" \
+              -o "$RUNNER_TEMP/YandexHomeWidgets-1.4.7.apk"
+            adb install "$RUNNER_TEMP/YandexHomeWidgets-1.4.7.apk"
+            adb install -r "dist/YandexHomeWidgets-${APP_VERSION}.apk"
+            adb shell dumpsys package ru.dislive.yandexhomewidgets | grep -F "versionName=1.4.8"
+            adb shell am force-stop ru.dislive.yandexhomewidgets
+            adb shell am start -W -n ru.dislive.yandexhomewidgets/.MainActivity
+            sleep 8
+            mkdir -p emulator-preview
+            adb exec-out screencap -p > emulator-preview/home.png
+            adb logcat -d -s AndroidRuntime:E > emulator-preview/android-runtime.log
+            if grep -q "FATAL EXCEPTION" emulator-preview/android-runtime.log; then
+              cat emulator-preview/android-runtime.log
+              exit 1
+            fi
+      - name: Upload emulator screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: yandex-home-emulator-preview
+          path: emulator-preview/
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
