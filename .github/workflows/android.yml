@@ -138,6 +138,23 @@ jobs:
           PY
           echo "FIXED_SOURCE_ARCHIVE=$RUNNER_TEMP/YandexHomeWidgets_source_fixed.zip" >> "$GITHUB_ENV"
 
+      - name: Diagnose Android package and signing configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "HOME=$HOME"
+          echo "Cached Android directory:"
+          ls -la "$HOME/.android" || true
+          if [[ -f "$HOME/.android/debug.keystore" ]]; then
+            keytool -list -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey | grep -E 'Alias name:|Creation date:|SHA256:|Owner:|Valid from:'
+          else
+            echo "::warning::No default debug keystore exists."
+          fi
+          echo "Project signing files:"
+          find "$PROJECT_DIR" -type f \( -iname '*.jks' -o -iname '*.keystore' \) -print
+          echo "Gradle identity/signing declarations:"
+          grep -RniE --include='*.gradle' --include='*.gradle.kts' 'applicationId|namespace|signingConfig|storeFile|keyAlias' "$PROJECT_DIR" || true
+
       - name: Build debug APK
         shell: bash
         run: |
@@ -151,6 +168,9 @@ jobs:
           fi
           mkdir -p "$GITHUB_WORKSPACE/dist"
           cp "$apk" "$GITHUB_WORKSPACE/dist/YandexHomeWidgets-${APP_VERSION}.apk"
+          echo "Selected APK: $apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | head -n 1
 
       - name: Update source archive with the verified fix
         if: success() && github.event_name != 'pull_request'
