@@ -136,9 +136,9 @@ replace_once(
                     } else if (page == AppPage.SCENARIOS) {
                         TextButton(onClick = { page = AppPage.SETTINGS }) { Text("⚙", fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.86f)) }
                     } else {''',
-    '''                        TextButton(onClick = { page = AppPage.PROFILE }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)) { SmartGlyph("user", Modifier.size(21.dp), MaterialTheme.colorScheme.primary) }
+    '''                        TextButton(onClick = { page = AppPage.SETTINGS }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)) { SmartGlyph("settings", Modifier.size(22.dp), MaterialTheme.colorScheme.primary) }
                     } else if (page in setOf(AppPage.SCENARIOS, AppPage.AUTOMATIONS, AppPage.PROFILE)) {
-                        if (page != AppPage.PROFILE) TextButton(onClick = { page = AppPage.PROFILE }) { SmartGlyph("user", Modifier.size(21.dp), MaterialTheme.colorScheme.primary) }
+                        if (page != AppPage.PROFILE) TextButton(onClick = { page = AppPage.SETTINGS }) { SmartGlyph("settings", Modifier.size(22.dp), MaterialTheme.colorScheme.primary) }
                         else TextButton(onClick = { page = AppPage.SETTINGS }) { SmartGlyph("settings", Modifier.size(21.dp), MaterialTheme.colorScheme.primary) }
                     } else {''',
     "Secondary header actions"
@@ -425,10 +425,10 @@ nav = '''                if (isConnected && page in setOf(AppPage.HOME, AppPage.
                             colors = NavigationBarItemDefaults.colors(selectedIconColor = selectedColor, selectedTextColor = selectedColor, unselectedIconColor = idleColor, unselectedTextColor = idleColor, indicatorColor = selectedColor.copy(alpha = 0.13f))
                         )
                         NavigationBarItem(
-                            selected = page == AppPage.SCENARIOS,
-                            onClick = { page = AppPage.SCENARIOS },
-                            icon = { SmartGlyph("sparkles", Modifier.size(21.dp), if (page == AppPage.SCENARIOS) selectedColor else idleColor) },
-                            label = { Text("Сценарии", maxLines = 1, fontSize = 9.sp) },
+                            selected = page == AppPage.ANALYTICS,
+                            onClick = { page = AppPage.ANALYTICS },
+                            icon = { SmartGlyph("chart", Modifier.size(21.dp), if (page == AppPage.ANALYTICS) selectedColor else idleColor) },
+                            label = { Text("Аналитика", maxLines = 1, fontSize = 9.sp) },
                             colors = NavigationBarItemDefaults.colors(selectedIconColor = selectedColor, selectedTextColor = selectedColor, unselectedIconColor = idleColor, unselectedTextColor = idleColor, indicatorColor = selectedColor.copy(alpha = 0.13f))
                         )
                         NavigationBarItem(
@@ -436,13 +436,6 @@ nav = '''                if (isConnected && page in setOf(AppPage.HOME, AppPage.
                             onClick = { page = AppPage.AUTOMATIONS },
                             icon = { SmartGlyph("sparkles", Modifier.size(21.dp), if (page == AppPage.AUTOMATIONS) selectedColor else idleColor) },
                             label = { Text("Автоматизации", maxLines = 1, fontSize = 8.sp) },
-                            colors = NavigationBarItemDefaults.colors(selectedIconColor = selectedColor, selectedTextColor = selectedColor, unselectedIconColor = idleColor, unselectedTextColor = idleColor, indicatorColor = selectedColor.copy(alpha = 0.13f))
-                        )
-                        NavigationBarItem(
-                            selected = page in setOf(AppPage.PROFILE, AppPage.SETTINGS, AppPage.ANALYTICS),
-                            onClick = { page = AppPage.PROFILE },
-                            icon = { SmartGlyph("user", Modifier.size(21.dp), if (page in setOf(AppPage.PROFILE, AppPage.SETTINGS, AppPage.ANALYTICS)) selectedColor else idleColor) },
-                            label = { Text("Профиль", maxLines = 1, fontSize = 9.sp) },
                             colors = NavigationBarItemDefaults.colors(selectedIconColor = selectedColor, selectedTextColor = selectedColor, unselectedIconColor = idleColor, unselectedTextColor = idleColor, indicatorColor = selectedColor.copy(alpha = 0.13f))
                         )
                     }
@@ -647,4 +640,4 @@ text = text.replace('Color.White.copy(alpha = 0.075f)', 'MaterialTheme.colorSche
 # Add the marker only after every anchor was found.
 text = text.rstrip() + "\n\n" + MARKER + "\n"
 source.write_text(text, encoding="utf-8")
-print("Applied dual theme, five-tab navigation, independent devices/automation/profile screens and dynamic key cards.")
+print("Applied dual theme, four-tab navigation, independent devices/automation/profile screens and dynamic key cards.")
