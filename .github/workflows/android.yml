@@ -106,7 +106,7 @@ jobs:
           fi
 
           # Ordered scenario action lists and dashboard polish.
-          app_version="1.8.0"
+          app_version="1.8.1"
           if [[ -n "$version_file" ]]; then
             printf '%s\n' "$app_version" > "$version_file"
           fi
