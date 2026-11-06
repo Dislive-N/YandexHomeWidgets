@@ -527,7 +527,7 @@ replace_once(
 replace_once('Text("ПОГОДА РЯДОМ", color = Color.White.copy(alpha = 0.84f)', 'Text("ПОГОДА РЯДОМ", color = weatherMuted', "Weather title")
 replace_once('color = Color.White.copy(alpha = 0.94f),\n                                    fontSize = 12.sp,', 'color = weatherInk,\n                                    fontSize = 12.sp,', "Weather place")
 replace_once('CircularProgressIndicator(Modifier.size(16.dp), color = Color.White, strokeWidth = 1.8.dp)', 'CircularProgressIndicator(Modifier.size(16.dp), color = weatherInk, strokeWidth = 1.8.dp)', "Weather loading")
-replace_once('else Text("↻", color = Color.White, fontSize = 20.sp)', 'else Text("↻", color = weatherInk, fontSize = 20.sp)', "Weather refresh icon")
+replace_once('else Text("↻", color = Color.White, fontSize = 20.sp)', 'else Text("↻", color = weatherInk, fontSize = 28.sp, modifier = Modifier.padding(2.dp))', "Weather refresh icon")
 replace_once('''                                    color = Color.White,
                                     fontSize = weatherTemperatureSize,''', '''                                    color = weatherInk,
                                     fontSize = weatherTemperatureSize,''', "Weather temperature")
