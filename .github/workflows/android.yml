@@ -106,7 +106,7 @@ jobs:
           fi
 
           # Ordered scenario action lists and dashboard polish.
-          app_version="1.5.4"
+          app_version="1.6.0"
           if [[ -n "$version_file" ]]; then
             printf '%s\n' "$app_version" > "$version_file"
           fi
@@ -240,6 +240,7 @@ jobs:
             python3 "$GITHUB_WORKSPACE/.github/scripts/redesign_dashboard.py" "$source_file"
           fi
           python3 "$GITHUB_WORKSPACE/.github/scripts/refine_scenarios.py" "$PROJECT_DIR/app/src/main/java/ru/dislive/yandexhomewidgets/ScenarioCenter.kt"
+          python3 "$GITHUB_WORKSPACE/.github/scripts/refine_reference_design.py" "$PROJECT_DIR/app/src/main/java/ru/dislive/yandexhomewidgets/MainActivity.kt"
           python3 - "$PROJECT_DIR" "$RUNNER_TEMP/YandexHomeWidgets_source_fixed.zip" <<'PY'
           from pathlib import Path
           import sys
