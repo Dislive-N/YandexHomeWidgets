@@ -38,22 +38,15 @@ def replace_lambda_item(anchor: str, replacement: str, label: str):
         raise SystemExit(f"{label}: closing brace missing")
     text = text[:at] + replacement + text[end:]
 
-# Fix the unit strings in the weather panel and remove a copied terminal control code.
-replace_once(
-    'Text("${"%.1f".format(Locale.getDefault(), weather.windMetersPerSecond)} " м/с", color = weatherInk, fontSize = 11.sp, fontWeight = FontWeight.Bold)',
-    'Text("${"%.1f".format(Locale.getDefault(), weather.windMetersPerSecond)} м/с", color = weatherInk, fontSize = 11.sp, fontWeight = FontWeight.Bold)',
-    "Weather wind value"
-)
-replace_once(
-    'Text("${weather.humidityPercent}"%", color = weatherInk, fontSize = 11.sp, fontWeight = FontWeight.Bold)',
-    'Text("${weather.humidityPercent}%", color = weatherInk, fontSize = 11.sp, fontWeight = FontWeight.Bold)',
-    "Weather humidity value"
-)
-replace_once(
-    'Text("${"%.1f".format(Locale.getDefault(), weather.precipitationMm)} " мм", color = weatherInk, fontSize = 11.sp, fontWeight = FontWeight.Bold)',
-    'Text("${"%.1f".format(Locale.getDefault(), weather.precipitationMm)} мм", color = weatherInk, fontSize = 11.sp, fontWeight = FontWeight.Bold)',
-    "Weather precipitation value"
-)
+# Normalize old malformed weather-unit strings when present; current source may already be correct.
+weather_fixes = [
+    ('Text("${"%.1f".format(Locale.getDefault(), weather.windMetersPerSecond)} " м/с", color = weatherInk, fontSize = 11.sp, fontWeight = FontWeight.Bold)', 'Text("${"%.1f".format(Locale.getDefault(), weather.windMetersPerSecond)} м/с", color = weatherInk, fontSize = 11.sp, fontWeight = FontWeight.Bold)'),
+    ('Text("${weather.humidityPercent}"%", color = weatherInk, fontSize = 11.sp, fontWeight = FontWeight.Bold)', 'Text("${weather.humidityPercent}%", color = weatherInk, fontSize = 11.sp, fontWeight = FontWeight.Bold)'),
+    ('Text("${"%.1f".format(Locale.getDefault(), weather.precipitationMm)} " мм", color = weatherInk, fontSize = 11.sp, fontWeight = FontWeight.Bold)', 'Text("${"%.1f".format(Locale.getDefault(), weather.precipitationMm)} мм", color = weatherInk, fontSize = 11.sp, fontWeight = FontWeight.Bold)'),
+]
+for malformed, corrected in weather_fixes:
+    if malformed in text:
+        text = text.replace(malformed, corrected, 1)
 text = text.replace("\x1b[0m", "")
 
 # Add local room/sensor summaries; no extra API requests are made.
