@@ -105,8 +105,8 @@ jobs:
             app_version="$(tr -d '[:space:]' < "$version_file")"
           fi
 
-          # Dashboard redesign release: bump the app to 1.5.3.
-          app_version="1.5.3"
+          # Ordered scenario action lists and dashboard polish.
+          app_version="1.5.4"
           if [[ -n "$version_file" ]]; then
             printf '%s\n' "$app_version" > "$version_file"
           fi
@@ -239,6 +239,7 @@ jobs:
             echo "UI_REDESIGN_APPLIED=true" >> "$GITHUB_ENV"
             python3 "$GITHUB_WORKSPACE/.github/scripts/redesign_dashboard.py" "$source_file"
           fi
+          python3 "$GITHUB_WORKSPACE/.github/scripts/refine_scenarios.py" "$PROJECT_DIR/app/src/main/java/ru/dislive/yandexhomewidgets/ScenarioCenter.kt"
           python3 - "$PROJECT_DIR" "$RUNNER_TEMP/YandexHomeWidgets_source_fixed.zip" <<'PY'
           from pathlib import Path
           import sys
