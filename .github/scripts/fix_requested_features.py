@@ -22,6 +22,21 @@ if "LOCAL_SCENARIO_DISABLE" not in marker.read_text(encoding="utf-8"):
 else:
     print("Requested Kotlin source patch already present")
 
+scenario = root / "app/src/main/java/ru/dislive/yandexhomewidgets/ScenarioCenter.kt"
+scenario_text = scenario.read_text(encoding="utf-8")
+wrong_call = "actionDescription(action, devices, variables, cloudScenarios), Modifier.weight(1f)"
+right_call = "actionDescription(action, devices, variables, cloudScenarios, localScenarios), Modifier.weight(1f)"
+scenario_text = scenario_text.replace(wrong_call, right_call)
+missing_brace = '''                            ) { actionLocalScenario = it }
+                        }
+                    Row(Modifier.fillMaxWidth().padding(14.dp)'''
+with_brace = '''                            ) { actionLocalScenario = it }
+                        }
+                    }
+                    Row(Modifier.fillMaxWidth().padding(14.dp)'''
+scenario_text = scenario_text.replace(missing_brace, with_brace)
+scenario.write_text(scenario_text, encoding="utf-8")
+
 icon = root / "app/src/main/res/drawable-nodpi/ic_launcher_foreground.webp"
 image = Image.open(icon).convert("RGBA")
 bounds = image.getchannel("A").getbbox()
