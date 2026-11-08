@@ -245,6 +245,8 @@ jobs:
           python3 "$GITHUB_WORKSPACE/.github/scripts/refine_full_interface_b.py" "$PROJECT_DIR/app/src/main/java/ru/dislive/yandexhomewidgets/MainActivity.kt"
           python3 "$GITHUB_WORKSPACE/.github/scripts/refine_theme_navigation.py" "$PROJECT_DIR/app/src/main/java/ru/dislive/yandexhomewidgets/MainActivity.kt"
           python3 "$GITHUB_WORKSPACE/.github/scripts/refine_visual_polish.py" "$PROJECT_DIR/app/src/main/java/ru/dislive/yandexhomewidgets/MainActivity.kt"
+          python3 -m pip install --user pillow
+          python3 "$GITHUB_WORKSPACE/.github/scripts/fix_requested_features.py" "$PROJECT_DIR"
           python3 - "$PROJECT_DIR" "$RUNNER_TEMP/YandexHomeWidgets_source_fixed.zip" <<'PY'
           from pathlib import Path
           import sys
