@@ -260,6 +260,14 @@ jobs:
           PY
           echo "FIXED_SOURCE_ARCHIVE=$RUNNER_TEMP/YandexHomeWidgets_source_fixed.zip" >> "$GITHUB_ENV"
 
+      - name: Upload extracted source project for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: extracted-source-project
+          path: ${{ env.FIXED_SOURCE_ARCHIVE }}
+          if-no-files-found: error
+          retention-days: 2
+
       - name: Stage current dashboard source for review
         shell: bash
         run: |
