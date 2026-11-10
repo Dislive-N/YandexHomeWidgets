@@ -13,6 +13,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
       - name: Checkout repository
@@ -105,8 +106,8 @@ jobs:
             app_version="$(tr -d '[:space:]' < "$version_file")"
           fi
 
-          # Ordered scenario action lists and dashboard polish.
-          app_version="1.8.1"
+          # Release containing the geofence, scenario-action and responsive-card fixes.
+          app_version="1.8.2"
           if [[ -n "$version_file" ]]; then
             printf '%s\n' "$app_version" > "$version_file"
           fi
@@ -227,6 +228,11 @@ jobs:
           PY
           echo "FIXED_SOURCE_ARCHIVE=$RUNNER_TEMP/YandexHomeWidgets_source_fixed.zip" >> "$GITHUB_ENV"
 
+      - name: Set up Python for image processing
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - name: Redesign smart-home dashboard and scenarios
         shell: bash
         run: |
@@ -245,6 +251,8 @@ jobs:
           python3 "$GITHUB_WORKSPACE/.github/scripts/refine_full_interface_b.py" "$PROJECT_DIR/app/src/main/java/ru/dislive/yandexhomewidgets/MainActivity.kt"
           python3 "$GITHUB_WORKSPACE/.github/scripts/refine_theme_navigation.py" "$PROJECT_DIR/app/src/main/java/ru/dislive/yandexhomewidgets/MainActivity.kt"
           python3 "$GITHUB_WORKSPACE/.github/scripts/refine_visual_polish.py" "$PROJECT_DIR/app/src/main/java/ru/dislive/yandexhomewidgets/MainActivity.kt"
+          python -m pip install --disable-pip-version-check "Pillow==12.0.0"
+          python3 "$GITHUB_WORKSPACE/.github/scripts/fix_requested_features.py" "$PROJECT_DIR"
           python3 - "$PROJECT_DIR" "$RUNNER_TEMP/YandexHomeWidgets_source_fixed.zip" <<'PY'
           from pathlib import Path
           import sys
@@ -259,6 +267,14 @@ jobs:
           print(f"Prepared redesigned source archive: {output} ({output.stat().st_size} bytes)")
           PY
           echo "FIXED_SOURCE_ARCHIVE=$RUNNER_TEMP/YandexHomeWidgets_source_fixed.zip" >> "$GITHUB_ENV"
+
+      - name: Upload extracted source project for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: extracted-source-project
+          path: ${{ env.FIXED_SOURCE_ARCHIVE }}
+          if-no-files-found: error
+          retention-days: 2
 
       - name: Stage current dashboard source for review
         shell: bash
@@ -407,6 +423,13 @@ jobs:
           path: ~/.android
           key: yandex-home-debug-signing-key-v1
 
+      - name: Require legacy signing key for compatible updates
+        if: steps.legacy-signing-key.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          echo "::error::The original Legacy signing key is unavailable; refusing to publish an APK that cannot update existing Legacy installs."
+          exit 1
+
       - name: Build legacy-compatible APK
         if: steps.legacy-signing-key.outputs.cache-hit == 'true'
         shell: bash
@@ -462,24 +485,10 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Publish update to GitHub Releases
-        if: github.event_name != 'pull_request'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: app-v${{ env.APP_VERSION }}-build-${{ github.run_number }}
-          name: Яндекс Дом ${{ env.APP_VERSION }} · сборка #${{ github.run_number }}
-          body: |
-            Яндекс Дом ${{ env.APP_VERSION }} — обновление приложения.
-            В архиве доступны обычная и Legacy APK-сборки. Устанавливайте вариант,
-            совместимый с подписью уже установленного приложения.
-          prerelease: false
-          files: dist/*.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install previous release and test update in Android emulator
-        continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
+        timeout-minutes: 15
         env:
           APP_VERSION: ${{ env.APP_VERSION }}
         with:
@@ -493,10 +502,10 @@ jobs:
             set -euo pipefail
             adb wait-for-device
             curl -fsSL --retry 3 --retry-delay 2 \
-              "https://github.com/Dislive-N/YandexHomeWidgets/releases/download/app-v1.4.7-build-57/YandexHomeWidgets-1.4.7.apk" \
-              -o "$RUNNER_TEMP/YandexHomeWidgets-1.4.7.apk"
-            adb install "$RUNNER_TEMP/YandexHomeWidgets-1.4.7.apk"
-            adb install -r "dist/YandexHomeWidgets-${APP_VERSION}.apk"
+              "https://github.com/Dislive-N/YandexHomeWidgets/releases/download/app-v1.8.1-build-141/YandexHomeWidgets-1.8.1-legacy.apk" \
+              -o "$RUNNER_TEMP/YandexHomeWidgets-1.8.1-legacy.apk"
+            adb install "$RUNNER_TEMP/YandexHomeWidgets-1.8.1-legacy.apk"
+            adb install -r "dist/YandexHomeWidgets-${APP_VERSION}-legacy.apk"
             adb shell dumpsys package ru.dislive.yandexhomewidgets | grep -F "versionName=${APP_VERSION}"
             adb shell am force-stop ru.dislive.yandexhomewidgets
             adb shell am start -W -n ru.dislive.yandexhomewidgets/.MainActivity
@@ -516,4 +525,18 @@ jobs:
           path: emulator-preview/
           if-no-files-found: ignore
           retention-days: 7
+      - name: Publish update to GitHub Releases
+        if: success() && github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: app-v${{ env.APP_VERSION }}-build-${{ github.run_number }}
+          name: Яндекс Дом ${{ env.APP_VERSION }} · сборка #${{ github.run_number }}
+          body: |
+            Яндекс Дом ${{ env.APP_VERSION }} — обновление приложения.
+            В архиве доступны обычная и Legacy APK-сборки. Устанавливайте вариант,
+            совместимый с подписью уже установленного приложения.
+          prerelease: false
+          files: dist/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

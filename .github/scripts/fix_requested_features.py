@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+import base64
+import subprocess
+import sys
+import zlib
+from pathlib import Path
+from PIL import Image
+
+PATCH_B64 = """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"""
+root = Path(sys.argv[1]).resolve()
+marker = root / "app/src/main/java/ru/dislive/yandexhomewidgets/data/LocalAutomation.kt"
+if "LOCAL_SCENARIO_DISABLE" not in marker.read_text(encoding="utf-8"):
+    patch = zlib.decompress(base64.b64decode(PATCH_B64)).decode("utf-8")
+    result = subprocess.run(
+        ["patch", "-p0", "--batch", "--forward", "-d", str(root)],
+        input=patch, text=True, capture_output=True
+    )
+    if result.returncode:
+        sys.stderr.write(result.stdout + result.stderr)
+        raise SystemExit(result.returncode)
+    print(result.stdout)
+else:
+    print("Requested Kotlin source patch already present")
+
+scenario = root / "app/src/main/java/ru/dislive/yandexhomewidgets/ScenarioCenter.kt"
+scenario_text = scenario.read_text(encoding="utf-8")
+wrong_call = "actionDescription(action, devices, variables, cloudScenarios), Modifier.weight(1f)"
+right_call = "actionDescription(action, devices, variables, cloudScenarios, localScenarios), Modifier.weight(1f)"
+scenario_text = scenario_text.replace(wrong_call, right_call)
+missing_brace = '''                            ) { actionLocalScenario = it }
+                        }
+                    Row(Modifier.fillMaxWidth().padding(14.dp)'''
+with_brace = '''                            ) { actionLocalScenario = it }
+                        }
+                    }
+                    Row(Modifier.fillMaxWidth().padding(14.dp)'''
+scenario_text = scenario_text.replace(missing_brace, with_brace)
+scenario.write_text(scenario_text, encoding="utf-8")
+
+icon = root / "app/src/main/res/drawable-nodpi/ic_launcher_foreground.webp"
+image = Image.open(icon).convert("RGBA")
+bounds = image.getchannel("A").getbbox()
+if not bounds:
+    raise SystemExit("Launcher icon foreground has no visible pixels")
+left, top, right, bottom = bounds
+if left > 5 or top > 5 or right < image.width - 5 or bottom < image.height - 5:
+    bounds = (max(0, left - 3), max(0, top - 3), min(image.width, right + 3), min(image.height, bottom + 3))
+    image = image.crop(bounds).resize((432, 432), Image.Resampling.LANCZOS)
+    image.save(icon, format="WEBP", quality=96, method=6)
+    print("Launcher icon transparent margins cropped")
+else:
+    print("Launcher icon already fills foreground")
+
+# Fix release-tag parsing. Four backslashes in the Kotlin source produced an
+# invalid regex, so same-version builds were treated as build 0 by the updater.
+updates_file = root / "app/src/main/java/ru/dislive/yandexhomewidgets/data/AppUpdates.kt"
+updates_text = updates_file.read_text(encoding="utf-8")
+wrong_version_pattern = r'(?:\\\\.[0-9]+)'
+right_version_pattern = r'(?:\\.[0-9]+)'
+wrong_build_pattern = r'(\\\\d+)'
+right_build_pattern = r'(\\d+)'
+wrong_count = updates_text.count(wrong_version_pattern)
+wrong_build_count = updates_text.count(wrong_build_pattern)
+if wrong_count == 1 and wrong_build_count == 1:
+    updates_text = updates_text.replace(wrong_version_pattern, right_version_pattern, 1)
+    updates_text = updates_text.replace(wrong_build_pattern, right_build_pattern, 1)
+    updates_file.write_text(updates_text, encoding="utf-8")
+    print("Fixed GitHub release version/build parsing in AppUpdates.kt")
+elif wrong_count == 0 and wrong_build_count == 0 and updates_text.count(right_version_pattern) == 1 and updates_text.count(right_build_pattern) == 1:
+    print("GitHub release version/build parsing already fixed")
+else:
+    raise SystemExit(
+        "Unexpected AppUpdates.kt release regex state: "
+        f"version_old={wrong_count}, build_old={wrong_build_count}, "
+        f"version_fixed={updates_text.count(right_version_pattern)}, "
+        f"build_fixed={updates_text.count(right_build_pattern)}"
+    )
+
