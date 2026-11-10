@@ -415,10 +415,14 @@ if "val pageStateHolder = rememberSaveableStateHolder()" not in main_text:
     anchor = '    var groupReturnPage by remember { mutableStateOf(AppPage.HOME) }'
     main_text = replace_unique(main_text, anchor, anchor + '\n    val pageStateHolder = rememberSaveableStateHolder()', "saveable state holder state")
 if "pageStateHolder.SaveableStateProvider(page.name)" not in main_text:
+    home_screen_anchor = "AppPage.HOME -> HomeScreen("
+    route_pos = main_text.find(home_screen_anchor)
+    if route_pos < 0:
+        raise SystemExit("HomeScreen route not found for SaveableStateProvider")
     when_anchor = "when (page) {"
-    if main_text.count(when_anchor) != 1:
-        raise SystemExit("Expected one page router to wrap in SaveableStateProvider")
-    start = main_text.index(when_anchor)
+    start = main_text.rfind(when_anchor, 0, route_pos)
+    if start < 0:
+        raise SystemExit("Page-content router not found for SaveableStateProvider")
     brace = main_text.index("{", start)
     depth = 0
     i = brace
@@ -427,7 +431,7 @@ if "pageStateHolder.SaveableStateProvider(page.name)" not in main_text:
         ch = main_text[i]
         nxt = main_text[i + 1] if i + 1 < len(main_text) else ""
         if state == "code":
-            if ch == '"' :
+            if ch == '"':
                 if main_text[i:i+3] == '"""':
                     state = "triple"; i += 3; continue
                 state = "string"
@@ -445,24 +449,23 @@ if "pageStateHolder.SaveableStateProvider(page.name)" not in main_text:
                     end = i + 1
                     break
         elif state == "string":
-            if ch == "\\":
-                i += 2; continue
+            if ch == "\\\\": i += 2; continue
             if ch == '"': state = "code"
         elif state == "char":
-            if ch == "\\": i += 2; continue
+            if ch == "\\\\": i += 2; continue
             if ch == "'": state = "code"
         elif state == "triple":
             if main_text[i:i+3] == '"""':
                 state = "code"; i += 3; continue
         elif state == "line":
-            if ch == "\n": state = "code"
+            if ch == "\\n": state = "code"
         elif state == "block":
             if ch == "*" and nxt == "/":
                 state = "code"; i += 2; continue
         i += 1
     else:
-        raise SystemExit("Could not find end of page router")
-    main_text = main_text[:start] + "pageStateHolder.SaveableStateProvider(page.name) {\n" + main_text[start:end] + "\n}" + main_text[end:]
+        raise SystemExit("Could not find matching end of page-content router")
+    main_text = main_text[:start] + "pageStateHolder.SaveableStateProvider(page.name) {\\n" + main_text[start:end] + "\\n}" + main_text[end:]
 
 # A single back action is shared by the toolbar and Android system Back gesture.
 if "fun navigateBack()" not in main_text:
