@@ -407,10 +407,11 @@ if "var groupReturnPage by remember" not in main_text:
 if "val pageStateHolder = rememberSaveableStateHolder()" not in main_text:
     if "import androidx.compose.runtime.saveable.rememberSaveableStateHolder" not in main_text:
         import re
-        package_match = re.search(r"(?m)^package[ \\t]+[^\\r\\n]+", main_text)
-        if package_match is None:
-            raise SystemExit("MainActivity package declaration not found")
-        main_text = main_text[:package_match.end()] + "\\n\\nimport androidx.compose.runtime.saveable.rememberSaveableStateHolder\\n" + main_text[package_match.end():]
+        first_import = re.search(r"(?m)^import[ \\t]+", main_text)
+        if first_import is None:
+            main_text = "import androidx.compose.runtime.saveable.rememberSaveableStateHolder\\n" + main_text
+        else:
+            main_text = main_text[:first_import.start()] + "import androidx.compose.runtime.saveable.rememberSaveableStateHolder\\n" + main_text[first_import.start():]
     anchor = '    var groupReturnPage by remember { mutableStateOf(AppPage.HOME) }'
     main_text = replace_unique(main_text, anchor, anchor + '\n    val pageStateHolder = rememberSaveableStateHolder()', "saveable state holder state")
 if "pageStateHolder.SaveableStateProvider(page.name)" not in main_text:
