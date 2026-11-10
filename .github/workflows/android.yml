@@ -13,6 +13,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
       - name: Checkout repository
@@ -484,23 +485,10 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Publish update to GitHub Releases
-        if: github.event_name != 'pull_request'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: app-v${{ env.APP_VERSION }}-build-${{ github.run_number }}
-          name: Яндекс Дом ${{ env.APP_VERSION }} · сборка #${{ github.run_number }}
-          body: |
-            Яндекс Дом ${{ env.APP_VERSION }} — обновление приложения.
-            В архиве доступны обычная и Legacy APK-сборки. Устанавливайте вариант,
-            совместимый с подписью уже установленного приложения.
-          prerelease: false
-          files: dist/*.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install previous release and test update in Android emulator
         uses: reactivecircus/android-emulator-runner@v2
+        timeout-minutes: 15
         env:
           APP_VERSION: ${{ env.APP_VERSION }}
         with:
@@ -537,4 +525,18 @@ jobs:
           path: emulator-preview/
           if-no-files-found: ignore
           retention-days: 7
+      - name: Publish update to GitHub Releases
+        if: success() && github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: app-v${{ env.APP_VERSION }}-build-${{ github.run_number }}
+          name: Яндекс Дом ${{ env.APP_VERSION }} · сборка #${{ github.run_number }}
+          body: |
+            Яндекс Дом ${{ env.APP_VERSION }} — обновление приложения.
+            В архиве доступны обычная и Legacy APK-сборки. Устанавливайте вариант,
+            совместимый с подписью уже установленного приложения.
+          prerelease: false
+          files: dist/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
