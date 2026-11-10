@@ -106,8 +106,8 @@ jobs:
             app_version="$(tr -d '[:space:]' < "$version_file")"
           fi
 
-          # Release containing the geofence, scenario-action and responsive-card fixes.
-          app_version="1.8.2"
+          # Theme, navigation, auto-grid and notifications widget update.
+          app_version="1.8.3"
           if [[ -n "$version_file" ]]; then
             printf '%s\n' "$app_version" > "$version_file"
           fi
