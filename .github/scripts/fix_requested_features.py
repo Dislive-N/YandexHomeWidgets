@@ -379,7 +379,7 @@ if "notifications_widget_description" not in strings_text:
     strings.write_text(strings_text, encoding="utf-8")
 
 
-# SMART-HOME-UX-NOTIFICATIONS-NAV-1.8.5
+# SMART-HOME-UX-NOTIFICATIONS-NAV-1.8.6
 # Scenario run notices, room/page-state restoration and roomier device power controls.
 main_activity = root / "app/src/main/java/ru/dislive/yandexhomewidgets/MainActivity.kt"
 main_text = main_activity.read_text(encoding="utf-8")
@@ -494,14 +494,22 @@ main_text = main_text.replace(
 old_back = """TextButton(onClick = {\n                            if (page == AppPage.GROUP_DETAILS) page = AppPage.GROUPS\n                            else { page = AppPage.HOME; selectedDeviceId = null; selectedGroupId = null }\n                        }) { Text(\"← Назад\") }"""
 if old_back in main_text:
     main_text = main_text.replace(old_back, 'TextButton(onClick = { navigateBack() }) { Text("← Назад") }', 1)
+# Fix the actual power control: the favourite icon is a separate button.
+power_anchor = 'if (device.canToggle) {\n                        Box(Modifier.size(27.dp).clip(CircleShape)'
+power_replacement = 'if (device.canToggle) {\n                        Box(Modifier.size(34.dp).clip(CircleShape)'
+if power_anchor in main_text:
+    main_text = replace_unique(main_text, power_anchor, power_replacement, "device power button size")
+elif power_replacement not in main_text:
+    raise SystemExit("Power control container anchor not found")
+glyph_old = 'SmartGlyph(if (on) "off" else "power", Modifier.size(17.dp), Color.White)'
+glyph_new = 'SmartGlyph(if (on) "off" else "power", Modifier.size(21.dp).padding(1.dp), Color.White)'
+if glyph_old in main_text:
+    main_text = replace_unique(main_text, glyph_old, glyph_new, "device power icon size")
+elif glyph_new not in main_text:
+    raise SystemExit("Power control icon anchor not found")
 main_text = main_text.replace(
-    'Box(Modifier.size(32.dp).clip(CircleShape)',
-    'Box(Modifier.size(36.dp).clip(CircleShape)',
-    1
-)
-main_text = main_text.replace(
-    'SmartGlyph(if (on) "off" else "power", Modifier.size(22.dp), Color.White)',
-    'SmartGlyph(if (on) "off" else "power", Modifier.size(25.dp).padding(1.dp), Color.White)',
+    'Modifier.weight(1f).height(55.dp)',
+    'Modifier.weight(1f).height(62.dp)',
     1
 )
 main_text = main_text.replace(
@@ -590,16 +598,16 @@ automation_file.write_text(automation_text, encoding="utf-8")
 
 # Keep release metadata consistent with the workflow's version.
 version_file = root / "VERSION.txt"
-version_file.write_text("1.8.5\n", encoding="utf-8")
+version_file.write_text("1.8.6\n", encoding="utf-8")
 gradle_file = root / "app/build.gradle.kts"
 gradle_text = gradle_file.read_text(encoding="utf-8")
 import re
-gradle_text, version_count = re.subn(r'(versionName\s*=\s*)["\'][^"\']+["\']', r'\g<1>"1.8.5"', gradle_text, count=1)
+gradle_text, version_count = re.subn(r'(versionName\s*=\s*)["\'][^"\']+["\']', r'\g<1>"1.8.6"', gradle_text, count=1)
 if version_count != 1:
     raise SystemExit("Could not update app versionName to 1.8.5")
 gradle_file.write_text(gradle_text, encoding="utf-8")
 
-notes = root / "PATCH_NOTES_1.8.5.txt"
+notes = root / "PATCH_NOTES_1.8.6.txt"
 notes.write_text(
     "Яндекс Дом 1.8.5\n"
     "- События устройств и успешные запуски облачных и локальных сценариев выводятся в системные уведомления Android/HyperOS.\n"
