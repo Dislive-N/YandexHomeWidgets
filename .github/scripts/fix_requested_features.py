@@ -510,15 +510,15 @@ main_text = main_text.replace(
 # Show a native system notification after successful cloud scenario runs.
 if "HomeNotificationCenter.showScenarioRun(context, scenario.name)" not in main_text:
     import re
-    pattern = r"((?:api|it)\\.runScenario\\(scenario\\.id\\))"
+    pattern = r"((?:api|it)\.runScenario\(scenario\.id\))"
     main_text, count = re.subn(
         pattern,
-        r"\\1\\n                                    HomeNotificationCenter.showScenarioRun(context, scenario.name)",
+        r"\1\n                                    HomeNotificationCenter.showScenarioRun(context, scenario.name)",
         main_text
     )
     if count == 0:
         # Some source revisions wrap the API action in a receiver lambda with a different name.
-        pattern = r"(runScenario\\(scenario\\.id\\))"
+        pattern = r"(runScenario\(scenario\.id\))"
         main_text, count = re.subn(
             pattern,
             r"\\1\\n                                    HomeNotificationCenter.showScenarioRun(context, scenario.name)",
