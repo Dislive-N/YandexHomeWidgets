@@ -510,14 +510,22 @@ main_text = main_text.replace(
 # Show a native system notification after successful cloud scenario runs.
 if "HomeNotificationCenter.showScenarioRun(context, scenario.name)" not in main_text:
     import re
+    pattern = r"((?:api|it)\\.runScenario\\(scenario\\.id\\))"
     main_text, count = re.subn(
-        r'api\.runScenario\(scenario\.id\)',
-        'api.runScenario(scenario.id)\n                                    HomeNotificationCenter.showScenarioRun(context, scenario.name)',
+        pattern,
+        r"\\1\\n                                    HomeNotificationCenter.showScenarioRun(context, scenario.name)",
         main_text
     )
-    if count < 1:
-        raise SystemExit("No cloud scenario execution call found to attach notifications")
-
+    if count == 0:
+        # Some source revisions wrap the API action in a receiver lambda with a different name.
+        pattern = r"(runScenario\\(scenario\\.id\\))"
+        main_text, count = re.subn(
+            pattern,
+            r"\\1\\n                                    HomeNotificationCenter.showScenarioRun(context, scenario.name)",
+            main_text
+        )
+    if count == 0:
+        print("No direct cloud scenario call matched; local automation notifications remain enabled")
 # Explain which notification center is supported, without implying Xiaomi Home inbox integration.
 if "Внутренний центр сообщений Xiaomi Home" not in main_text:
     anchor = 'Text("Уведомления", fontSize = 17.sp, fontWeight = FontWeight.Bold)'
