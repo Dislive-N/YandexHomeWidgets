@@ -406,12 +406,13 @@ if "var groupReturnPage by remember" not in main_text:
 # Keep each page's saveable scroll state alive while switching to detail screens.
 if "val pageStateHolder = rememberSaveableStateHolder()" not in main_text:
     if "import androidx.compose.runtime.saveable.rememberSaveableStateHolder" not in main_text:
-        anchor = "import androidx.compose.runtime.saveable.Saver\n"
-        if anchor in main_text:
-            main_text = main_text.replace(anchor, anchor + "import androidx.compose.runtime.saveable.rememberSaveableStateHolder\n", 1)
-        else:
-            anchor = "import androidx.compose.runtime.saveable.rememberSaveable\n"
-            main_text = replace_unique(main_text, anchor, anchor + "import androidx.compose.runtime.saveable.rememberSaveableStateHolder\n", "saveable state holder import")
+        package_line = "package ru.dislive.yandexhomewidgets\\n"
+        main_text = replace_unique(
+            main_text,
+            package_line,
+            package_line + "\\nimport androidx.compose.runtime.saveable.rememberSaveableStateHolder\\n",
+            "saveable state holder import"
+        )
     anchor = '    var groupReturnPage by remember { mutableStateOf(AppPage.HOME) }'
     main_text = replace_unique(main_text, anchor, anchor + '\n    val pageStateHolder = rememberSaveableStateHolder()', "saveable state holder state")
 if "pageStateHolder.SaveableStateProvider(page.name)" not in main_text:
