@@ -449,10 +449,10 @@ if "pageStateHolder.SaveableStateProvider(page.name)" not in main_text:
                     end = i + 1
                     break
         elif state == "string":
-            if ch == "\\\\": i += 2; continue
+            if ch == "\\": i += 2; continue
             if ch == '"': state = "code"
         elif state == "char":
-            if ch == "\\\\": i += 2; continue
+            if ch == "\\": i += 2; continue
             if ch == "'": state = "code"
         elif state == "triple":
             if main_text[i:i+3] == '"""':
@@ -465,7 +465,7 @@ if "pageStateHolder.SaveableStateProvider(page.name)" not in main_text:
         i += 1
     else:
         raise SystemExit("Could not find matching end of page-content router")
-    main_text = main_text[:start] + "pageStateHolder.SaveableStateProvider(page.name) {\\n" + main_text[start:end] + "\\n}" + main_text[end:]
+    main_text = main_text[:start] + "pageStateHolder.SaveableStateProvider(page.name) {\n" + main_text[start:end] + "\n}" + main_text[end:]
 
 # A single back action is shared by the toolbar and Android system Back gesture.
 if "fun navigateBack()" not in main_text:
