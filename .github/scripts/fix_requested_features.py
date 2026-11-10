@@ -521,7 +521,7 @@ if "HomeNotificationCenter.showScenarioRun(context, scenario.name)" not in main_
         pattern = r"(runScenario\(scenario\.id\))"
         main_text, count = re.subn(
             pattern,
-            r"\\1\\n                                    HomeNotificationCenter.showScenarioRun(context, scenario.name)",
+            r"\1\n                                    HomeNotificationCenter.showScenarioRun(context, scenario.name)",
             main_text
         )
     if count == 0:
