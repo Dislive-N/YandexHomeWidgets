@@ -76,3 +76,305 @@ else:
         f"build_fixed={updates_text.count(right_build_pattern)}"
     )
 
+
+
+# HOME-WIDGETS-NAV-AUTO-1.8.3: theme, navigation, responsive columns and event widget.
+main_activity = root / "app/src/main/java/ru/dislive/yandexhomewidgets/MainActivity.kt"
+manifest = root / "app/src/main/AndroidManifest.xml"
+strings = root / "app/src/main/res/values/strings.xml"
+widget_dir = root / "app/src/main/java/ru/dislive/yandexhomewidgets/widget"
+widget_xml = root / "app/src/main/res/xml/notifications_widget_info.xml"
+main_text = main_activity.read_text(encoding="utf-8")
+marker = "// HOME-WIDGETS-NAV-AUTO-1.8.3"
+
+def replace_unique(source, old, new, label):
+    count = source.count(old)
+    if count != 1:
+        raise SystemExit(f"{label}: expected exactly one anchor, found {count}")
+    return source.replace(old, new, 1)
+
+if marker not in main_text:
+    main_text = replace_unique(
+        main_text,
+        "Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent)",
+        "Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent, contentColor = MaterialTheme.colorScheme.onSurface)",
+        "dark theme root text color"
+    )
+    main_text = replace_unique(
+        main_text,
+        "private enum class AppPage { HOME, DEVICES, SCENARIOS, AUTOMATIONS, PROFILE, HISTORY, ANALYTICS, SETTINGS, DEVICE, GROUPS, GROUP_DETAILS }",
+        "private enum class AppPage { HOME, DEVICES, SCENARIOS, AUTOMATIONS, HISTORY, ANALYTICS, SETTINGS, DEVICE, GROUPS, GROUP_DETAILS }",
+        "remove Profile page"
+    )
+    main_text = replace_unique(main_text, '                                AppPage.PROFILE -> "Профиль"\n', "", "remove Profile title")
+    old_actions = '''                    if (isConnected && page in setOf(AppPage.HOME, AppPage.DEVICES)) {
+                        TextButton(onClick = { history = HomeHistoryStore.load(context); page = AppPage.HISTORY }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)) {
+                            SmartGlyph("clock", Modifier.size(21.dp), MaterialTheme.colorScheme.primary)
+                        }
+                        TextButton(onClick = { if (!isBusy && !isSyncing) scope.launch { reloadHome() } }, enabled = !isBusy && !isSyncing, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)) {
+                            if (isSyncing) CircularProgressIndicator(Modifier.size(19.dp), strokeWidth = 2.dp)
+                            else Text("↻", fontSize = 25.sp, color = MaterialTheme.colorScheme.primary)
+                        }
+                        TextButton(onClick = { page = AppPage.PROFILE }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)) { SmartGlyph("user", Modifier.size(21.dp), MaterialTheme.colorScheme.primary) }
+                    } else if (page in setOf(AppPage.SCENARIOS, AppPage.AUTOMATIONS, AppPage.PROFILE)) {
+                        if (page != AppPage.PROFILE) TextButton(onClick = { page = AppPage.PROFILE }) { SmartGlyph("user", Modifier.size(21.dp), MaterialTheme.colorScheme.primary) }
+                        else TextButton(onClick = { page = AppPage.SETTINGS }) { SmartGlyph("settings", Modifier.size(21.dp), MaterialTheme.colorScheme.primary) }
+                    } else {
+                        TextButton(onClick = {
+                            if (page == AppPage.GROUP_DETAILS) page = AppPage.GROUPS
+                            else { page = AppPage.HOME; selectedDeviceId = null; selectedGroupId = null }
+                        }) { Text("← Назад") }
+                    }'''
+    new_actions = '''                    if (page in setOf(AppPage.HOME, AppPage.DEVICES)) {
+                        if (isConnected) {
+                            TextButton(onClick = { history = HomeHistoryStore.load(context); page = AppPage.HISTORY }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)) {
+                                SmartGlyph("clock", Modifier.size(21.dp), MaterialTheme.colorScheme.primary)
+                            }
+                            TextButton(onClick = { if (!isBusy && !isSyncing) scope.launch { reloadHome() } }, enabled = !isBusy && !isSyncing, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)) {
+                                if (isSyncing) CircularProgressIndicator(Modifier.size(19.dp), strokeWidth = 2.dp)
+                                else Text("↻", fontSize = 25.sp, color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                        TextButton(onClick = { page = AppPage.SETTINGS }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)) {
+                            SmartGlyph("settings", Modifier.size(21.dp), MaterialTheme.colorScheme.primary)
+                        }
+                    } else if (page in setOf(AppPage.SCENARIOS, AppPage.AUTOMATIONS, AppPage.ANALYTICS, AppPage.HISTORY)) {
+                        TextButton(onClick = { page = AppPage.SETTINGS }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)) {
+                            SmartGlyph("settings", Modifier.size(21.dp), MaterialTheme.colorScheme.primary)
+                        }
+                    } else {
+                        TextButton(onClick = {
+                            if (page == AppPage.GROUP_DETAILS) page = AppPage.GROUPS
+                            else { page = AppPage.HOME; selectedDeviceId = null; selectedGroupId = null }
+                        }) { Text("← Назад") }
+                    }'''
+    main_text = replace_unique(main_text, old_actions, new_actions, "top-right Settings action")
+    profile_branch = '''                            AppPage.PROFILE -> ProfileScreen(
+                                isConnected = isConnected,
+                                deviceCount = devices.size,
+                                roomCount = roomNames.size,
+                                onOpenSettings = { page = AppPage.SETTINGS },
+                                onOpenGroups = { page = AppPage.GROUPS },
+                                onOpenHistory = { history = HomeHistoryStore.load(context); page = AppPage.HISTORY },
+                                onOpenAnalytics = { page = AppPage.ANALYTICS }
+                            )
+'''
+    main_text = replace_unique(main_text, profile_branch, "", "remove Profile route")
+    main_text = main_text.replace(
+        "AppPage.AUTOMATIONS, AppPage.PROFILE, AppPage.HISTORY",
+        "AppPage.AUTOMATIONS, AppPage.HISTORY"
+    )
+    old_nav = '''                        NavigationBarItem(
+                            selected = page in setOf(AppPage.PROFILE, AppPage.SETTINGS, AppPage.ANALYTICS),
+                            onClick = { page = AppPage.PROFILE },
+                            icon = { SmartGlyph("user", Modifier.size(21.dp), if (page in setOf(AppPage.PROFILE, AppPage.SETTINGS, AppPage.ANALYTICS)) selectedColor else idleColor) },
+                            label = { Text("Профиль", maxLines = 1, fontSize = 9.sp) },
+                            colors = NavigationBarItemDefaults.colors(selectedIconColor = selectedColor, selectedTextColor = selectedColor, unselectedIconColor = idleColor, unselectedTextColor = idleColor, indicatorColor = selectedColor.copy(alpha = 0.13f))
+                        )'''
+    new_nav = '''                        NavigationBarItem(
+                            selected = page == AppPage.ANALYTICS,
+                            onClick = { page = AppPage.ANALYTICS },
+                            icon = { SmartGlyph("chart", Modifier.size(21.dp), if (page == AppPage.ANALYTICS) selectedColor else idleColor) },
+                            label = { Text("Аналитика", maxLines = 1, fontSize = 9.sp) },
+                            colors = NavigationBarItemDefaults.colors(selectedIconColor = selectedColor, selectedTextColor = selectedColor, unselectedIconColor = idleColor, unselectedTextColor = idleColor, indicatorColor = selectedColor.copy(alpha = 0.13f))
+                        )'''
+    main_text = replace_unique(main_text, old_nav, new_nav, "replace Profile tab with Analytics")
+    main_text = replace_unique(
+        main_text,
+        'var deviceColumns by remember { mutableStateOf(config.getInt("device_columns", 3).coerceIn(1, 3)) }',
+        'var deviceColumns by remember { mutableStateOf(config.getInt("device_columns", 0).coerceIn(0, 3)) }',
+        "automatic grid default"
+    )
+    main_text = replace_unique(
+        main_text,
+        'onDeviceColumnsChange = { deviceColumns = it.coerceIn(1, 3); config.edit().putInt("device_columns", deviceColumns).apply() },',
+        'onDeviceColumnsChange = { deviceColumns = it.coerceIn(0, 3); config.edit().putInt("device_columns", deviceColumns).apply() },',
+        "automatic grid save"
+    )
+    main_text = main_text.replace(
+        'val effectiveColumns = deviceColumns.coerceIn(1, 3).coerceAtMost(fittingColumns)',
+        'val effectiveColumns = if (deviceColumns == 0) fittingColumns else deviceColumns.coerceIn(1, 3).coerceAtMost(fittingColumns)'
+    )
+    if main_text.count("if (deviceColumns == 0) fittingColumns") != 2:
+        raise SystemExit("Automatic column calculation must exist on both device grids")
+    main_text = replace_unique(
+        main_text,
+        'Text("Можно выбрать до трёх колонок. На узком экране сетка сама уменьшит число колонок, а карточки займут всю доступную ширину.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f))',
+        'Text("Авто подбирает максимально возможное число колонок (до трёх) по ширине экрана и размеру карточек. Можно также зафиксировать 1, 2 или 3 колонки.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f))',
+        "automatic grid description"
+    )
+    main_text = replace_unique(
+        main_text,
+        'listOf(1, 2, 3).forEach { count -> FilterChip(selected = deviceColumns == count, onClick = { onDeviceColumnsChange(count) }, label = { Text(count.toString()) }) }',
+        'listOf(0, 1, 2, 3).forEach { count -> FilterChip(selected = deviceColumns == count, onClick = { onDeviceColumnsChange(count) }, label = { Text(if (count == 0) "Авто" else count.toString()) }) }',
+        "automatic grid selector"
+    )
+    main_text = main_text.replace(
+        'import ru.dislive.yandexhomewidgets.widget.HomeWidget\n',
+        'import ru.dislive.yandexhomewidgets.widget.HomeWidget\nimport ru.dislive.yandexhomewidgets.widget.NotificationsWidget\n',
+        1
+    )
+    main_text = replace_unique(
+        main_text,
+        '            HomeWidget().updateAll(context)\n            ScenarioWidget().updateAll(context)',
+        '            HomeWidget().updateAll(context)\n            ScenarioWidget().updateAll(context)\n            NotificationsWidget().updateAll(context)',
+        "refresh notification widget"
+    )
+    main_text = replace_unique(
+        main_text,
+        'history = history,\n                                onClear = { HomeHistoryStore.clear(context); history = emptyList() }',
+        'history = history,\n                                onClear = { HomeHistoryStore.clear(context); history = emptyList(); scope.launch { NotificationsWidget().updateAll(context) } }',
+        "clear notification widget"
+    )
+    main_text = main_text.rstrip() + "\n\n" + marker + "\n"
+    main_activity.write_text(main_text, encoding="utf-8")
+
+# Update the periodic background refresh, without redundant same-package imports.
+worker = root / "app/src/main/java/ru/dislive/yandexhomewidgets/widget/SyncWorker.kt"
+worker_text = worker.read_text(encoding="utf-8")
+worker_marker = "// NOTIFICATIONS-WIDGET-SYNC-1.8.3"
+if worker_marker not in worker_text:
+    worker_text = replace_unique(
+        worker_text,
+        '            HomeWidget().updateAll(applicationContext)\n            Result.success()',
+        '            HomeWidget().updateAll(applicationContext)\n            ScenarioWidget().updateAll(applicationContext)\n            NotificationsWidget().updateAll(applicationContext)\n            Result.success()',
+        "background widget refresh"
+    )
+    worker_text = worker_text.rstrip() + "\n" + worker_marker + "\n"
+    worker.write_text(worker_text, encoding="utf-8")
+
+# A resizable Android home-screen widget backed by the real local event history.
+widget_dir.mkdir(parents=True, exist_ok=True)
+(widget_dir / "NotificationsWidget.kt").write_text(r'''package ru.dislive.yandexhomewidgets.widget
+
+import android.content.Context
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.glance.GlanceId
+import androidx.glance.GlanceModifier
+import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.GlanceAppWidgetReceiver
+import androidx.glance.appwidget.provideContent
+import androidx.glance.background
+import androidx.glance.layout.Alignment
+import androidx.glance.layout.Column
+import androidx.glance.layout.Row
+import androidx.glance.layout.Spacer
+import androidx.glance.layout.defaultWeight
+import androidx.glance.layout.fillMaxSize
+import androidx.glance.layout.fillMaxWidth
+import androidx.glance.layout.height
+import androidx.glance.layout.padding
+import androidx.glance.text.FontWeight
+import androidx.glance.text.Text
+import androidx.glance.text.TextStyle
+import androidx.glance.unit.ColorProvider
+import ru.dislive.yandexhomewidgets.data.HomeHistoryStore
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+class NotificationsWidget : GlanceAppWidget() {
+    override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val changes = HomeHistoryStore.load(context).take(4)
+        val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+        provideContent {
+            Column(
+                modifier = GlanceModifier.fillMaxSize()
+                    .background(ColorProvider(Color(0xFF172238)))
+                    .padding(12.dp),
+                verticalAlignment = Alignment.Vertical.Top
+            ) {
+                Row(verticalAlignment = Alignment.Vertical.CenterVertically) {
+                    Text(
+                        "Уведомления",
+                        modifier = GlanceModifier.defaultWeight(),
+                        style = TextStyle(color = ColorProvider(Color.White), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    )
+                    Text(
+                        changes.size.toString(),
+                        style = TextStyle(color = ColorProvider(Color(0xFFC7B2FF)), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    )
+                }
+                Spacer(GlanceModifier.height(7.dp))
+                if (changes.isEmpty()) {
+                    Text(
+                        "Новых событий пока нет. Здесь появятся изменения устройств и датчиков.",
+                        style = TextStyle(color = ColorProvider(Color(0xFFC2CAD8)), fontSize = 11.sp)
+                    )
+                } else {
+                    changes.forEachIndexed { index, change ->
+                        Column(
+                            modifier = GlanceModifier.fillMaxWidth()
+                                .background(ColorProvider(Color(0xFF24334B)))
+                                .padding(horizontal = 9.dp, vertical = 6.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.Vertical.CenterVertically) {
+                                Text(
+                                    change.title,
+                                    modifier = GlanceModifier.defaultWeight(),
+                                    maxLines = 1,
+                                    style = TextStyle(color = ColorProvider(Color(0xFFE5D8FF)), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                )
+                                Text(
+                                    timeFormat.format(Date(change.timestamp)),
+                                    style = TextStyle(color = ColorProvider(Color(0xFF9FAFC4)), fontSize = 9.sp)
+                                )
+                            }
+                            Text(
+                                change.detail,
+                                maxLines = 2,
+                                style = TextStyle(color = ColorProvider(Color.White), fontSize = 10.sp)
+                            )
+                        }
+                        if (index != changes.lastIndex) Spacer(GlanceModifier.height(5.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+class NotificationsWidgetReceiver : GlanceAppWidgetReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = NotificationsWidget()
+}
+''', encoding="utf-8")
+
+widget_xml.write_text('''<?xml version="1.0" encoding="utf-8"?>
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="220dp"
+    android:minHeight="150dp"
+    android:minResizeWidth="180dp"
+    android:minResizeHeight="110dp"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/widget_loading"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:description="@string/notifications_widget_description" />
+''', encoding="utf-8")
+
+manifest_text = manifest.read_text(encoding="utf-8")
+if 'android:name=".widget.NotificationsWidgetReceiver"' not in manifest_text:
+    entry = '''        <receiver android:name=".widget.NotificationsWidgetReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/notifications_widget_info" />
+        </receiver>
+'''
+    manifest_text = replace_unique(
+        manifest_text,
+        '        <receiver android:name=".widget.ScenarioWidgetReceiver" android:exported="true">',
+        entry + '        <receiver android:name=".widget.ScenarioWidgetReceiver" android:exported="true">',
+        "Notifications widget receiver"
+    )
+    manifest.write_text(manifest_text, encoding="utf-8")
+
+strings_text = strings.read_text(encoding="utf-8")
+if "notifications_widget_description" not in strings_text:
+    strings_text = strings_text.replace(
+        "</resources>",
+        '<string name="notifications_widget_description">Последние изменения устройств и датчиков умного дома</string></resources>'
+    )
+    strings.write_text(strings_text, encoding="utf-8")
