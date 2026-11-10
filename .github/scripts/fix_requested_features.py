@@ -377,3 +377,202 @@ if "notifications_widget_description" not in strings_text:
         '<string name="notifications_widget_description">Последние изменения устройств и датчиков умного дома</string></resources>'
     )
     strings.write_text(strings_text, encoding="utf-8")
+
+
+# SMART-HOME-UX-NOTIFICATIONS-NAV-1.8.5
+# Scenario run notices, room/page-state restoration and roomier device power controls.
+main_activity = root / "app/src/main/java/ru/dislive/yandexhomewidgets/MainActivity.kt"
+main_text = main_activity.read_text(encoding="utf-8")
+
+if "import androidx.activity.compose.BackHandler" not in main_text:
+    main_text = replace_unique(
+        main_text,
+        "import androidx.activity.ComponentActivity\n",
+        "import androidx.activity.compose.BackHandler\nimport androidx.activity.ComponentActivity\n",
+        "BackHandler import"
+    )
+
+# Make sure each route remembers where it was opened from.
+page_state = '    var page by remember { mutableStateOf(AppPage.HOME) }'
+if "var settingsReturnPage by remember" not in main_text:
+    main_text = replace_unique(main_text, page_state, page_state + '\n    var settingsReturnPage by remember { mutableStateOf(AppPage.HOME) }', "settings return page")
+if "var deviceReturnPage by remember" not in main_text:
+    anchor = '    var settingsReturnPage by remember { mutableStateOf(AppPage.HOME) }'
+    main_text = replace_unique(main_text, anchor, anchor + '\n    var deviceReturnPage by remember { mutableStateOf(AppPage.HOME) }', "device return page")
+if "var groupReturnPage by remember" not in main_text:
+    anchor = '    var deviceReturnPage by remember { mutableStateOf(AppPage.HOME) }'
+    main_text = replace_unique(main_text, anchor, anchor + '\n    var groupReturnPage by remember { mutableStateOf(AppPage.HOME) }', "group return page")
+
+# Keep each page's saveable scroll state alive while switching to detail screens.
+if "val pageStateHolder = rememberSaveableStateHolder()" not in main_text:
+    if "import androidx.compose.runtime.saveable.rememberSaveableStateHolder" not in main_text:
+        anchor = "import androidx.compose.runtime.saveable.Saver\n"
+        if anchor in main_text:
+            main_text = main_text.replace(anchor, anchor + "import androidx.compose.runtime.saveable.rememberSaveableStateHolder\n", 1)
+        else:
+            anchor = "import androidx.compose.runtime.saveable.rememberSaveable\n"
+            main_text = replace_unique(main_text, anchor, anchor + "import androidx.compose.runtime.saveable.rememberSaveableStateHolder\n", "saveable state holder import")
+    anchor = '    var groupReturnPage by remember { mutableStateOf(AppPage.HOME) }'
+    main_text = replace_unique(main_text, anchor, anchor + '\n    val pageStateHolder = rememberSaveableStateHolder()', "saveable state holder state")
+if "pageStateHolder.SaveableStateProvider(page.name)" not in main_text:
+    when_anchor = "when (page) {"
+    if main_text.count(when_anchor) != 1:
+        raise SystemExit("Expected one page router to wrap in SaveableStateProvider")
+    start = main_text.index(when_anchor)
+    brace = main_text.index("{", start)
+    depth = 0
+    i = brace
+    state = "code"
+    while i < len(main_text):
+        ch = main_text[i]
+        nxt = main_text[i + 1] if i + 1 < len(main_text) else ""
+        if state == "code":
+            if ch == '"' :
+                if main_text[i:i+3] == '"""':
+                    state = "triple"; i += 3; continue
+                state = "string"
+            elif ch == "'":
+                state = "char"
+            elif ch == "/" and nxt == "/":
+                state = "line"; i += 2; continue
+            elif ch == "/" and nxt == "*":
+                state = "block"; i += 2; continue
+            elif ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    end = i + 1
+                    break
+        elif state == "string":
+            if ch == "\\":
+                i += 2; continue
+            if ch == '"': state = "code"
+        elif state == "char":
+            if ch == "\\": i += 2; continue
+            if ch == "'": state = "code"
+        elif state == "triple":
+            if main_text[i:i+3] == '"""':
+                state = "code"; i += 3; continue
+        elif state == "line":
+            if ch == "\n": state = "code"
+        elif state == "block":
+            if ch == "*" and nxt == "/":
+                state = "code"; i += 2; continue
+        i += 1
+    else:
+        raise SystemExit("Could not find end of page router")
+    main_text = main_text[:start] + "pageStateHolder.SaveableStateProvider(page.name) {\n" + main_text[start:end] + "\n}" + main_text[end:]
+
+# A single back action is shared by the toolbar and Android system Back gesture.
+if "fun navigateBack()" not in main_text:
+    pending = '    var pendingLocationAction by remember { mutableStateOf<((Location) -> Unit)?>(null) }'
+    back = """\n\n    fun navigateBack() {\n        when (page) {\n            AppPage.GROUP_DETAILS -> { page = groupReturnPage; selectedGroupId = null }\n            AppPage.DEVICE -> { page = deviceReturnPage; selectedDeviceId = null }\n            AppPage.SETTINGS -> page = settingsReturnPage\n            else -> { page = AppPage.HOME; selectedDeviceId = null; selectedGroupId = null }\n        }\n    }\n    BackHandler(enabled = page != AppPage.HOME) { navigateBack() }"""
+    main_text = replace_unique(main_text, pending, pending + back, "screen back handling")
+
+# Remember the origin page for settings/device/group detail routes.
+main_text = main_text.replace(
+    'TextButton(onClick = { page = AppPage.SETTINGS },',
+    'TextButton(onClick = { settingsReturnPage = page; page = AppPage.SETTINGS },'
+)
+main_text = main_text.replace(
+    'onOpenDevice = { selectedDeviceId = it.id; page = AppPage.DEVICE }',
+    'onOpenDevice = { deviceReturnPage = page; selectedDeviceId = it.id; page = AppPage.DEVICE }'
+)
+main_text = main_text.replace(
+    'onOpenGroup = { selectedGroupId = it.id; page = AppPage.GROUP_DETAILS }',
+    'onOpenGroup = { groupReturnPage = page; selectedGroupId = it.id; page = AppPage.GROUP_DETAILS }'
+)
+
+# Replace the old hard-coded Home destination with the remembered route.
+old_back = """TextButton(onClick = {\n                            if (page == AppPage.GROUP_DETAILS) page = AppPage.GROUPS\n                            else { page = AppPage.HOME; selectedDeviceId = null; selectedGroupId = null }\n                        }) { Text(\"← Назад\") }"""
+if old_back in main_text:
+    main_text = main_text.replace(old_back, 'TextButton(onClick = { navigateBack() }) { Text("← Назад") }', 1)
+main_text = main_text.replace(
+    'Box(Modifier.size(32.dp).clip(CircleShape)',
+    'Box(Modifier.size(36.dp).clip(CircleShape)',
+    1
+)
+main_text = main_text.replace(
+    'SmartGlyph(if (on) "off" else "power", Modifier.size(22.dp), Color.White)',
+    'SmartGlyph(if (on) "off" else "power", Modifier.size(25.dp).padding(1.dp), Color.White)',
+    1
+)
+main_text = main_text.replace(
+    'Modifier.weight(1f).height(55.dp)',
+    'Modifier.weight(1f).height(62.dp)',
+    1
+)
+
+# Show a native system notification after successful cloud scenario runs.
+if "HomeNotificationCenter.showScenarioRun(context, scenario.name)" not in main_text:
+    import re
+    main_text, count = re.subn(
+        r'api\.runScenario\(scenario\.id\)',
+        'api.runScenario(scenario.id)\n                                    HomeNotificationCenter.showScenarioRun(context, scenario.name)',
+        main_text
+    )
+    if count < 1:
+        raise SystemExit("No cloud scenario execution call found to attach notifications")
+
+# Explain which notification center is supported, without implying Xiaomi Home inbox integration.
+if "Внутренний центр сообщений Xiaomi Home" not in main_text:
+    anchor = 'Text("Уведомления", fontSize = 17.sp, fontWeight = FontWeight.Bold)'
+    if anchor in main_text:
+        main_text = main_text.replace(
+            anchor,
+            anchor + '\n                Text("События устройств и запуск сценариев выводятся в системные уведомления Android/HyperOS. Внутренний центр Xiaomi Home принимает события самой экосистемы Xiaomi.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f))',
+            1
+        )
+main_text = main_text.rstrip() + "\n\n" + marker + "\n"
+main_activity.write_text(main_text, encoding="utf-8")
+
+# Add a notification for local automations (manual and automatic triggers).
+notifications_file = root / "app/src/main/java/ru/dislive/yandexhomewidgets/data/HomeNotifications.kt"
+notifications_text = notifications_file.read_text(encoding="utf-8")
+if "fun showScenarioRun(" not in notifications_text:
+    helper = """    fun showScenarioRun(context: Context, scenarioName: String, automatic: Boolean = false) {\n        val options = HomeNotificationSettings.load(context)\n        if (!options.enabled || !options.groupScenarioChanges) return\n        if (Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return\n        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager\n        val channelId = \"scenario_notifications\"\n        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && manager.getNotificationChannel(channelId) == null) {\n            manager.createNotificationChannel(NotificationChannel(channelId, \"Уведомления сценариев\", NotificationManager.IMPORTANCE_DEFAULT))\n        }\n        val intent = Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)\n        val notificationId = (System.currentTimeMillis() % Int.MAX_VALUE).toInt()\n        val pendingIntent = PendingIntent.getActivity(context, notificationId, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)\n        val title = if (automatic) \"Автоматизация выполнена\" else \"Сценарий выполнен\"\n        val message = scenarioName.ifBlank { \"Умный дом\" }\n        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Builder(context, channelId) else Notification.Builder(context)\n        manager.notify(notificationId, builder.setSmallIcon(R.drawable.ic_home).setContentTitle(title).setContentText(message)\n            .setStyle(Notification.BigTextStyle().bigText(message)).setContentIntent(pendingIntent).setAutoCancel(true)\n            .setGroup(\"yandex_home_scenario_events\").build())\n    }\n\n"""
+    anchor = "    fun showAutomationNotification("
+    if anchor not in notifications_text:
+        raise SystemExit("HomeNotifications: could not locate automation notification insertion point")
+    notifications_text = notifications_text.replace(anchor, helper + anchor, 1)
+    notifications_file.write_text(notifications_text, encoding="utf-8")
+
+# Attach notifications to local automation completion, only on success.
+automation_file = root / "app/src/main/java/ru/dislive/yandexhomewidgets/data/LocalAutomation.kt"
+automation_text = automation_file.read_text(encoding="utf-8")
+if "HomeNotificationCenter.showScenarioRun(context, automation.name, automatic = true)" not in automation_text:
+    old = "val result = runCatching { executeActions(context, api, home, automation.actions) }"
+    new = old + "\n                if (result.isSuccess) HomeNotificationCenter.showScenarioRun(context, automation.name, automatic = true)"
+    automation_text = replace_unique(automation_text, old, new, "automatic local automation notification")
+if "HomeNotificationCenter.showScenarioRun(context, automation.name, automatic = false)" not in automation_text:
+    old = "LocalAutomationStore.recordManualRun(context, automationId)"
+    automation_text = replace_unique(
+        automation_text,
+        old,
+        old + "\n        HomeNotificationCenter.showScenarioRun(context, automation.name, automatic = false)",
+        "manual local automation notification"
+    )
+automation_file.write_text(automation_text, encoding="utf-8")
+
+# Keep release metadata consistent with the workflow's version.
+version_file = root / "VERSION.txt"
+version_file.write_text("1.8.5\n", encoding="utf-8")
+gradle_file = root / "app/build.gradle.kts"
+gradle_text = gradle_file.read_text(encoding="utf-8")
+import re
+gradle_text, version_count = re.subn(r'(versionName\s*=\s*)["\'][^"\']+["\']', r'\g<1>"1.8.5"', gradle_text, count=1)
+if version_count != 1:
+    raise SystemExit("Could not update app versionName to 1.8.5")
+gradle_file.write_text(gradle_text, encoding="utf-8")
+
+notes = root / "PATCH_NOTES_1.8.5.txt"
+notes.write_text(
+    "Яндекс Дом 1.8.5\n"
+    "- События устройств и успешные запуски облачных и локальных сценариев выводятся в системные уведомления Android/HyperOS.\n"
+    "- Увеличена кнопка питания и добавлен внутренний отступ иконки, чтобы она не обрезалась.\n"
+    "- При переходе к подробностям, настройкам и обратно сохраняется положение прокрутки каждого экрана.\n"
+    "- Системная кнопка/жест «Назад» возвращает на предыдущий экран.\n"
+    "- Внутренний центр сообщений Xiaomi Home остаётся отдельной функцией экосистемы Xiaomi; публичного API для публикации туда сторонних событий нет.\n",
+    encoding="utf-8"
+)
