@@ -50,3 +50,29 @@ if left > 5 or top > 5 or right < image.width - 5 or bottom < image.height - 5:
     print("Launcher icon transparent margins cropped")
 else:
     print("Launcher icon already fills foreground")
+
+# Fix release-tag parsing. Four backslashes in the Kotlin source produced an
+# invalid regex, so same-version builds were treated as build 0 by the updater.
+updates_file = root / "app/src/main/java/ru/dislive/yandexhomewidgets/data/AppUpdates.kt"
+updates_text = updates_file.read_text(encoding="utf-8")
+wrong_version_pattern = r'(?:\\\\.[0-9]+)'
+right_version_pattern = r'(?:\\.[0-9]+)'
+wrong_build_pattern = r'(\\\\d+)'
+right_build_pattern = r'(\\d+)'
+wrong_count = updates_text.count(wrong_version_pattern)
+wrong_build_count = updates_text.count(wrong_build_pattern)
+if wrong_count == 1 and wrong_build_count == 1:
+    updates_text = updates_text.replace(wrong_version_pattern, right_version_pattern, 1)
+    updates_text = updates_text.replace(wrong_build_pattern, right_build_pattern, 1)
+    updates_file.write_text(updates_text, encoding="utf-8")
+    print("Fixed GitHub release version/build parsing in AppUpdates.kt")
+elif wrong_count == 0 and wrong_build_count == 0 and updates_text.count(right_version_pattern) == 1 and updates_text.count(right_build_pattern) == 1:
+    print("GitHub release version/build parsing already fixed")
+else:
+    raise SystemExit(
+        "Unexpected AppUpdates.kt release regex state: "
+        f"version_old={wrong_count}, build_old={wrong_build_count}, "
+        f"version_fixed={updates_text.count(right_version_pattern)}, "
+        f"build_fixed={updates_text.count(right_build_pattern)}"
+    )
+
