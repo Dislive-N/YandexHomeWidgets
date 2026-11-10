@@ -553,17 +553,36 @@ if "fun showScenarioRun(" not in notifications_text:
 automation_file = root / "app/src/main/java/ru/dislive/yandexhomewidgets/data/LocalAutomation.kt"
 automation_text = automation_file.read_text(encoding="utf-8")
 if "HomeNotificationCenter.showScenarioRun(context, automation.name, automatic = true)" not in automation_text:
-    old = "val result = runCatching { executeActions(context, api, home, automation.actions) }"
-    new = old + "\n                if (result.isSuccess) HomeNotificationCenter.showScenarioRun(context, automation.name, automatic = true)"
-    automation_text = replace_unique(automation_text, old, new, "automatic local automation notification")
+    automatic_call = "runCatching { executeActions(context, api, home, automation.actions) }"
+    if automatic_call in automation_text:
+        automation_text = automation_text.replace(
+            automatic_call,
+            "runCatching { executeActions(context, api, home, automation.actions) }.onSuccess { HomeNotificationCenter.showScenarioRun(context, automation.name, automatic = true) }",
+            1
+        )
+    else:
+        # Older source versions execute directly inside the successful geofence/condition branch.
+        claim = "LocalAutomationStore.claimAutomaticRun(context, automation.id, matches)"
+        claim_pos = automation_text.find(claim)
+        execute = "executeActions(context, api, home, automation.actions)"
+        execute_pos = automation_text.find(execute, claim_pos if claim_pos >= 0 else 0)
+        if execute_pos >= 0:
+            line_end = automation_text.find("\n", execute_pos)
+            if line_end < 0: line_end = execute_pos + len(execute)
+            automation_text = automation_text[:line_end] + "\n                    HomeNotificationCenter.showScenarioRun(context, automation.name, automatic = true)" + automation_text[line_end:]
+        else:
+            print("Automatic local automation execution anchor not found; no automatic run notice added")
+
 if "HomeNotificationCenter.showScenarioRun(context, automation.name, automatic = false)" not in automation_text:
-    old = "LocalAutomationStore.recordManualRun(context, automationId)"
-    automation_text = replace_unique(
-        automation_text,
-        old,
-        old + "\n        HomeNotificationCenter.showScenarioRun(context, automation.name, automatic = false)",
-        "manual local automation notification"
-    )
+    manual_anchor = "LocalAutomationStore.recordManualRun(context, automationId)"
+    if manual_anchor in automation_text:
+        automation_text = automation_text.replace(
+            manual_anchor,
+            manual_anchor + "\n        HomeNotificationCenter.showScenarioRun(context, automation.name, automatic = false)",
+            1
+        )
+    else:
+        print("Manual automation record anchor not found; no manual run notice added")
 automation_file.write_text(automation_text, encoding="utf-8")
 
 # Keep release metadata consistent with the workflow's version.
