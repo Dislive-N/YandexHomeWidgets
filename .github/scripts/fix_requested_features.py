@@ -458,7 +458,7 @@ if "pageStateHolder.SaveableStateProvider(page.name)" not in main_text:
             if main_text[i:i+3] == '"""':
                 state = "code"; i += 3; continue
         elif state == "line":
-            if ch == "\\n": state = "code"
+            if ch == "\n": state = "code"
         elif state == "block":
             if ch == "*" and nxt == "/":
                 state = "code"; i += 2; continue
