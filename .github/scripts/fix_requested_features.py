@@ -604,7 +604,7 @@ gradle_text = gradle_file.read_text(encoding="utf-8")
 import re
 gradle_text, version_count = re.subn(r'(versionName\s*=\s*)["\'][^"\']+["\']', r'\g<1>"1.8.6"', gradle_text, count=1)
 if version_count != 1:
-    raise SystemExit("Could not update app versionName to 1.8.5")
+    raise SystemExit("Could not update app versionName to 1.8.6")
 gradle_file.write_text(gradle_text, encoding="utf-8")
 
 notes = root / "PATCH_NOTES_1.8.6.txt"
